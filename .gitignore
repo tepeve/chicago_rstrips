@@ -16,8 +16,17 @@ __pycache__/
 # ----------------------------------------------------
 # 2. Datos y Archivos de Salida
 # ----------------------------------------------------
-# datos procesados o extraídos
-data/
+# Ignorar contenido de data/ pero mantener estructura
+data/*
+!data/.gitkeep
+!data/raw/
+data/raw/*
+!data/raw/.gitkeep
+!data/processed/
+data/processed/*
+!data/processed/.gitkeep
+
+# Archivos de datos en cualquier ubicación
 *.csv
 *.json
 *.parquet
