@@ -12,5 +12,9 @@ dependencies = [
     "psycopg2-binary",
     "requests>=2.32.5",
     "sodapy",
-    "dotenv"
+    "python-dotenv"    
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

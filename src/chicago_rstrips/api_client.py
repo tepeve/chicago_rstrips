@@ -1,43 +1,24 @@
 import pandas as pd
 import requests
 import json
-import os
-from dotenv import load_dotenv 
+from chicago_rstrips.config import START_DATE, END_DATE, CHIC_TNP_API_URL, SOCRATA_APP_TOKEN
 
 
-########### CARGA DE VARIABLES DE ENTORNO ##############
-# Cargar el archivo .env
-load_dotenv()
+
+
+###########  API REQUEST ##############
 
 ## METADATA DEL ENDPOINT
 #https://dev.socrata.com/foundry/data.cityofchicago.org/6dvr-xwnh
 
-# CONFIGURACIÓN DE FECHAS DE CONSULTA
-# EN env se definió un rango de fechas para un mes completo (Septiembre 2025)
-
-start_date = os.getenv("START_DATE")
-end_date = os.getenv("END_DATE")
-
-# API ENDPOINT 
-url = os.getenv("CHIC_TNP_API_URL")
-app_token = os.getenv("SOCRATA_APP_TOKEN")
-
-# CARGA APP TOKEN DESDE ENTORNO
-
-if not app_token:
-    # Este error se mostrará si el .env no tiene la variable o si no se cargó correctamente.
-    print("Error: La variable de entorno SOCRATA_APP_TOKEN no está configurada o no se cargó.")
-    exit() 
-
-########### BLOQUE API REQUEST ##############
-
-# VAMOS A USAR EL PAQUETE REQUESTS DE PYTHON
+# PARA LA EJECUTAR LA SOLICITUD A LA API USAMOS EL PAQUETE REQUESTS DE PYTHON
 # VAMOS A ENVIAR LA CONSULTA MEDIANTE EL MÉTODO POST (RECOMENDADO PARA SOCRATA V3)
+# CARGAMOS APP TOKEN, FECHAS Y URL DESDE ENTORNO A TRAVÉS DE CONFIG.PY
 
 # DEFINIMOS HEADERS DE LA SOLICITUD
 headers = {
     "Accept": "application/json",
-    "X-App-Token": app_token,
+    "X-App-Token": SOCRATA_APP_TOKEN,
 }
 
 # ESCRIBIMOS LOS PARÁMETROS DE LA CONSULTA 
@@ -58,7 +39,7 @@ soql_query = f"""
 SELECT
   COUNT(*) AS total_registros_sampling
 WHERE
-  trip_start_timestamp BETWEEN '{start_date}' AND '{end_date}'
+  trip_start_timestamp BETWEEN '{START_DATE}' AND '{END_DATE}'
   AND trip_id LIKE '%a0'
 """
 
@@ -68,10 +49,10 @@ payload = {
 } 
 
 # EJECUTAMOS LA CONSULTA EN LA API CON EL MÉTODO POST
-print(f"Realizando solicitud POST a: {url}")
+print(f"Realizando solicitud POST a: {CHIC_TNP_API_URL}")
 try:
     # Realizar solicitud POST
-    response = requests.post(url, headers=headers, json=payload)
+    response = requests.post(CHIC_TNP_API_URL, headers=headers, json=payload)
 
     # VERIFICAMOS SI HUBO ERRORES HTTP 
     response.raise_for_status()
