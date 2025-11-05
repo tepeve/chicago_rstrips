@@ -9,7 +9,9 @@ START_DATE = os.getenv("START_DATE")
 END_DATE = os.getenv("END_DATE")
 
 # SOCRATA API TOKEN 
+# https://dev.socrata.com/foundry/data.cityofchicago.org/6dvr-xwnh
 CHIC_TNP_API_URL = os.getenv("CHIC_TNP_API_URL")
+# https://dev.socrata.com/docs/app-tokens
 SOCRATA_APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN")
 
 if not SOCRATA_APP_TOKEN:

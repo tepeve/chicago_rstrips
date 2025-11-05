@@ -1,4 +1,4 @@
-from chicago_rstrips.api_client import fetch_data_from_api
+from chicago_rstrips.socrata_api_client import fetch_data_from_api
 from chicago_rstrips.config import START_DATE, END_DATE
 from chicago_rstrips.utils import get_raw_data_dir
 

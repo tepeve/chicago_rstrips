@@ -1,5 +1,7 @@
 from pathlib import Path
 
+
+## Funciones para manejar rutas de directorios
 def get_project_root():
     """Obtiene el directorio raíz del proyecto."""
     return Path(__file__).parent.parent.parent

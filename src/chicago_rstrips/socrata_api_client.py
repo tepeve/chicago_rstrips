@@ -9,6 +9,7 @@ def fetch_data_from_api(soql_query):
 
     Args:
         soql_query (str): The SoQL query to execute.
+        More info in: https://dev.socrata.com/docs/queries/
 
     Returns:
         pd.DataFrame: A DataFrame containing the results, or None if no data is returned.
