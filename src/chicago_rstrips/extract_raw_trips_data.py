@@ -38,7 +38,7 @@ def extract_trips_data(output_filename="raw_trips_data.parquet"):
         output_path = get_raw_data_dir() / output_filename
         df.to_parquet(output_path, index=False)
         print(f"Datos guardados en {output_path}")
-        return output_path
+        return str(output_path) # Devolver como string para compatibilidad con Airflow
     else:
         print("No se encontraron datos para guardar.")
         return None

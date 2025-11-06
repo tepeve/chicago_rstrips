@@ -5,6 +5,9 @@ USER root
 # instala dependencias del proyecto (si usas pyproject.toml, puedes instalar con pip)
 COPY pyproject.toml /opt/airflow/
 
+# Cambiamos al usuario 'airflow' para instalar las dependencias
+USER airflow
+
 # Instalamos las dependencias de tu proyecto.
 # Omitimos 'apache-airflow' porque ya está en la imagen base.
 # Esto usa pip, que está incluido en la imagen.

@@ -3,7 +3,7 @@ from pendulum import datetime
 
 # Gracias al PYTHONPATH que definiste en Docker, esto funciona:
 from chicago_rstrips.extract_raw_trips_data import extract_trips_data
-from chicago_rstrips.load_raw_data import load_data_to_postgres # (La función que crearás)
+from chicago_rstrips.load_raw_trips_data import load_data_to_postgres # (La función que crearás)
 
 @dag(
     dag_id="chicago_trips_pipeline",
@@ -25,7 +25,7 @@ def etl_pipeline():
             print("No se generó archivo, se omite la carga.")
 
     # Define la dependencia
-    extract() >> load()
+    load( extract() )
 
 # Llama al DAG para instanciarlo
 etl_pipeline()
