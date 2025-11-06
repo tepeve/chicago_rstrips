@@ -1,0 +1,87 @@
+
+x-airflow-common:
+  &airflow-common
+  build: .
+  environment:
+    # Configuración del ejecutor de Airflow
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__CORE__LOAD_EXAMPLES=false
+    # Conexión a la METADATA DATABASE de Airflow
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres_airflow_db:5432/airflow_db
+    # Acá le indicamos a Airflow que tu paquete `chicago_rstrips` está en /opt/airflow/src
+    - PYTHONPATH=/opt/airflow/src
+  volumes:
+    # Monta tus carpetas locales en el contenedor.
+    - ./dags:/opt/airflow/dags
+    - ./src:/opt/airflow/src # Monta código fuente
+    - ./data:/opt/airflow/data # Monta carpeta de datos
+    - ./.env:/opt/airflow/.env # Pasa variables de entorno
+  depends_on:
+    - postgres_airflow_db
+
+services:
+  # ------------------------------------------------------------------
+  # SERVICIO 1: BASE DE DATOS LOCAL - DATA WAREHOUSE
+  # ------------------------------------------------------------------
+  postgres_local_db:
+    image: postgres:14
+    environment:
+      - POSTGRES_LOCAL_USER=2025_tomas_pont_verges      # <-- defino las credenciales como iguales a las de Redshift
+      - POSTGRES_LOCAL_PASSWORD=1W75DcIAKiyyx # <--  defino las credenciales como iguales a las de Redshift
+      - POSTGRES_LOCAL_DB=pda     # <--  defino las credenciales como iguales a las de Redshift
+    ports:
+      # Expone el puerto 5432 del contenedor en el puerto 5433 de tu PC
+      - "5433:5432"
+    volumes:
+      # Persiste los datos de tu warehouse en un volumen de Docker
+      - postgres_data:/var/lib/postgresql/data
+
+  # ------------------------------------------------------------------
+  # SERVICIO 2: METADATA DATABASE DE AIRFLOW
+  # ------------------------------------------------------------------
+  postgres_airflow_db:
+    image: postgres:14
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow_db
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+
+  # ------------------------------------------------------------------
+  # SERVICIO 3: INICIALIZADOR DE AIRFLOW
+  # (Se ejecuta una vez para preparar la BD de metadatos)
+  # ------------------------------------------------------------------
+  airflow-init:
+    <<: *airflow-common
+    command: bash -c "airflow db init; airflow users create --role Admin --username admin --password admin --email admin@example.com --firstname admin --lastname admin"
+    restart: on-failure
+
+  # ------------------------------------------------------------------
+  # SERVICIO 4: WEBSERVER DE AIRFLOW
+  # ------------------------------------------------------------------
+  airflow-webserver:
+    <<: *airflow-common
+    command: airflow webserver
+    ports:
+      - "8080:8080"
+    restart: always
+    depends_on:
+      - postgres_airflow_db
+      - airflow-init
+
+  # ------------------------------------------------------------------
+  # SERVICIO 5: SCHEDULER DE AIRFLOW 
+  # ------------------------------------------------------------------
+  airflow-scheduler:
+    <<: *airflow-common
+    command: airflow scheduler
+    restart: always
+    depends_on:
+      - postgres_airflow_db
+      - airflow-init
+
+# Define los volúmenes para persistir los datos
+volumes:
+  postgres_data:
+  airflow_db_data:

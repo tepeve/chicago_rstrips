@@ -21,6 +21,16 @@ if not SOCRATA_APP_TOKEN:
 # REDSHIFT CREDENTIALS
 REDSHIFT_HOST = os.getenv("REDSHIFT_HOST")
 REDSHIFT_PORT = os.getenv("REDSHIFT_PORT")
-REDSHIFT_DBNAME = os.getenv("REDSHIFT_DBNAME")
+REDSHIFT_DB = os.getenv("REDSHIFT_DB")
 REDSHIFT_PASSWORD = os.getenv("REDSHIFT_PASSWORD")
-REDSHIFT_USERNAME = os.getenv("REDSHIFT_USERNAME")
+REDSHIFT_USER = os.getenv("REDSHIFT_USER")
+
+
+# Local Postgres (para desarrollo)
+POSTGRES_LOCAL_HOST = os.getenv("POSTGRES_LOCAL_HOST", "localhost")
+POSTGRES_LOCAL_PORT = int(os.getenv("POSTGRES_LOCAL_PORT", 5433))
+POSTGRES_LOCAL_USER = os.getenv("POSTGRES_LOCAL_USER")
+POSTGRES_LOCAL_PASSWORD = os.getenv("POSTGRES_LOCAL_PASSWORD")
+POSTGRES_LOCAL_DB = os.getenv("POSTGRES_LOCAL_DB")
+if not all([POSTGRES_LOCAL_USER, POSTGRES_LOCAL_PASSWORD, POSTGRES_LOCAL_DB]):
+    raise ValueError("Las credenciales de la base de datos local Postgres no están completamente configuradas.")
