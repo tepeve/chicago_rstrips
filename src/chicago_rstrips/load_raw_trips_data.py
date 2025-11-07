@@ -1,5 +1,5 @@
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, String, Integer, Float, Boolean, DateTime
 from pathlib import Path
 from chicago_rstrips.config import (
     POSTGRES_LOCAL_USER,
@@ -36,6 +36,27 @@ def load_data_to_postgres(parquet_path, table_name="stg_raw_trips"):
         df = pd.read_parquet(parquet_path)
         print(f"Se cargaron {len(df)} registros desde el archivo.")
         
+        # NUEVO: Definir esquema explícito para PostgreSQL
+        dtype_mapping = {
+            'trip_id': String(50),
+            'trip_start_timestamp': DateTime,
+            'trip_end_timestamp': DateTime,
+            'trip_seconds': Integer,
+            'trip_miles': Float,
+            'percent_time_chicago': Float,
+            'percent_distance_chicago': Float,
+            'pickup_community_area': Integer,
+            'dropoff_community_area': Integer,
+            'fare': Float,
+            'tip': Float,
+            'additional_charges': Float,
+            'trip_total': Float,
+            'shared_trip_authorized': Boolean,
+            'trips_pooled': Integer,
+            'pickup_centroid_location': String(200),
+            'dropoff_centroid_location': String(200),
+        }
+
         # Construir la URL de conexión a PostgreSQL
         db_url = (
             f"postgresql+psycopg2://{POSTGRES_LOCAL_USER}:{POSTGRES_LOCAL_PASSWORD}"
@@ -51,10 +72,11 @@ def load_data_to_postgres(parquet_path, table_name="stg_raw_trips"):
         df.to_sql(
             name=table_name,
             con=engine,
-            if_exists="replace",  # Opciones: 'fail', 'replace', 'append'
+            if_exists="replace",
             index=False,
-            method="multi",  # Más eficiente para inserción de múltiples filas
-            chunksize=1000
+            method="multi",
+            chunksize=1000,
+            dtype=dtype_mapping # esquema explícito
         )
         
         print(f"✓ Datos cargados exitosamente a la tabla '{table_name}'")

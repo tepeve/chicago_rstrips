@@ -1,30 +1,42 @@
-# Usa la imagen oficial de Airflow con la versión que necesitas
-FROM apache/airflow:2.11.0-python3.11
+# Usamos la imagen de docker de airflow como base
+FROM apache/airflow:2.11.0-python3.11 AS builder
 
+# Instalar paquetes del sistema como 'root'
 USER root
-# instala dependencias del proyecto (si usas pyproject.toml, puedes instalar con pip)
-COPY pyproject.toml /opt/airflow/
 
-# Cambiamos al usuario 'airflow' para instalar las dependencias
+# 'libpq-dev' es para psycopg2
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# Volvemos al usuario 'airflow' para instalar paquetes de Python
 USER airflow
 
-# Instalamos las dependencias de tu proyecto.
-# Omitimos 'apache-airflow' porque ya está en la imagen base.
-# Esto usa pip, que está incluido en la imagen.
-RUN pip install --no-cache-dir \
-    "boto3" \
-    "numpy" \
-    "pandas" \
-    "psycopg2-binary" \
-    "requests>=2.32.5" \
-    "sodapy" \
-    "python-dotenv" \
-    "pyarrow" \
-    "sqlalchemy"
-# copiar el paquete y dags
-COPY src/ /opt/airflow/src/
-COPY dags/ /opt/airflow/dags/
+# instalamos 'uv'
+RUN pip install --no-cache-dir uv
 
+# Creamos un directorio de trabajo
+WORKDIR /app
 
-# Volvemos al usuario 'airflow' por seguridad y buenas prácticas
+# Copiamos el toml con las dependencias y el codigo fuente para empaquetar
+COPY pyproject.toml ./
+COPY src ./src
+
+# Le decimos a 'uv' que instale el proyecto local
+# 'uv' verifica que paquetes vienen preinstalados en la imagen de docker
+# y solo instala lo que faltan y el paquete del codigo fuente.
+RUN uv pip install .
+
+# Creamos la imagen final basada en Airflow
+FROM apache/airflow:2.11.0-python3.11
+
+# Copiamos las dependencias NUEVAS (boto3, sodapy, tu paquete)
+COPY --from=builder /home/airflow/.local/lib/python3.11/site-packages /home/airflow/.local/lib/python3.11/site-packages
+COPY --from=builder /app /app
+
+# Copiar el paquete de código fuente del proyecto y los DAGs
+COPY src /opt/airflow/src/
+COPY dags /opt/airflow/dags/
+
 USER airflow
