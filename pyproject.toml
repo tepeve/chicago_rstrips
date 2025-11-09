@@ -14,7 +14,13 @@ dependencies = [
     "python-dotenv",
     "pyarrow",
     "sqlalchemy",
-    "pytest"  
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "geopandas",
+    "shapely",
+    "matplotlib",
+    "folium"
 ]
 
 [build-system]
