@@ -194,14 +194,14 @@ def load_all_geospatial_features(points_gdf, voronoi_gdf, city_gdf):
         save_voronoi_zones(voronoi_gdf, engine)
         save_city_boundary(city_gdf, engine)
         
-        # 3. Verificar la carga con la función helper
-        print("\n" + "="*60)
-        print("ESTADÍSTICAS DE FEATURES CARGADAS")
-        print("="*60)
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT * FROM features.get_features_stats()"))
-            for row in result:
-                print(f"  • {row[0]}: {row[1]} registros (última actualización: {row[2]})")
+        # # 3. Verificar la carga con la función helper
+        # print("\n" + "="*60)
+        # print("ESTADÍSTICAS DE FEATURES CARGADAS")
+        # print("="*60)
+        # with engine.connect() as conn:
+        #     result = conn.execute(text("SELECT * FROM features.get_features_stats()"))
+        #     for row in result:
+        #         print(f"  • {row[0]}: {row[1]} registros (última actualización: {row[2]})")
         
         print("\n✅ Todas las features geoespaciales fueron cargadas exitosamente")
         

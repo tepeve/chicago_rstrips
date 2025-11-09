@@ -12,6 +12,9 @@ x-airflow-common:
     - PYTHONPATH=/opt/airflow/src
     # Clave secreta para el webserver de Airflow
     - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW__WEBSERVER__SECRET_KEY}
+    # UID/GID del usuario host para asignar ownership a los bind-mounts dentro del contenedor
+    - HOST_UID=${HOST_UID}
+    - HOST_GID=${HOST_GID}
   volumes:
     # Monta tus carpetas locales en el contenedor.
     - ./dags:/opt/airflow/dags
@@ -60,8 +63,21 @@ services:
   # ------------------------------------------------------------------
   airflow-init:
     <<: *airflow-common
-    command: bash -c "airflow db init; airflow users create --role Admin --username admin --password admin --email admin@example.com --firstname admin --lastname admin"
-    restart: on-failure
+    user: "0:0"  # Forzar ejecución como root (UID 0, GID 0)
+    entrypoint: /opt/airflow/entrypoint.sh
+    command:
+      - bash
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password admin
+    restart: "no"
 
   # ------------------------------------------------------------------
   # SERVICIO 4: WEBSERVER DE AIRFLOW

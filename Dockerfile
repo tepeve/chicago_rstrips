@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-
 # Volvemos al usuario 'airflow' para instalar paquetes de Python
 USER airflow
 
@@ -39,4 +38,18 @@ COPY --from=builder /app /app
 COPY src /opt/airflow/src/
 COPY dags /opt/airflow/dags/
 
-USER airflow
+# Copiar entrypoint que garantiza permisos en los bind-mounts montados desde el host.
+# El entrypoint intentará chown/chmod en los directorios montados antes de ejecutar el comando.
+COPY docker/entrypoint.sh /opt/airflow/entrypoint.sh
+USER root
+RUN chmod +x /opt/airflow/entrypoint.sh
+
+# Usar el entrypoint. Nota: el contenedor correrá el entrypoint como el usuario por defecto
+# de la imagen (root si no se ha cambiado). El entrypoint aplica los permisos y delega
+# la ejecución al comando final.
+ENTRYPOINT ["/opt/airflow/entrypoint.sh"]
+
+# Dejar que el proceso principal (airflow webserver/scheduler) corra. En este entorno de
+# desarrollo lo dejamos correr como root para asegurar que el entrypoint pueda ajustar
+# permisos en los bind-mounts. En entornos más restrictivos se puede mejorar para
+# dropear privilegios después del entrypoint.
