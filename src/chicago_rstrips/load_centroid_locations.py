@@ -38,7 +38,7 @@ def load_centroid_locations_to_postgres(parquet_path=None,
         load_dataframe_to_postgres(
             df,
             table_name=table_name,
-            schema="dim",
+            schema="dimlocation",
             dtype=dtype_mapping,
             ddl_path=ddl_path
         )
