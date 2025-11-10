@@ -10,7 +10,7 @@ CREATE SCHEMA IF NOT EXISTS staging;
 -- ============================================================
 -- 2. ELIMINAR TABLAS EXISTENTES (en orden correcto por FKs)
 -- ============================================================
-DROP TABLE IF EXISTS staging.create_stg_raw_trips CASCADE;
+DROP TABLE IF EXISTS staging.stg_raw_trips CASCADE;
 
 -- ============================================================
 -- 3. TABLA: Staging de Viajes Crudos
