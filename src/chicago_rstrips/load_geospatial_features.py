@@ -1,50 +1,7 @@
-import geopandas as gpd
 import pandas as pd
-from sqlalchemy import create_engine, text
 from pathlib import Path
 from chicago_rstrips.utils import get_data_dir
-from chicago_rstrips.config import (
-    POSTGRES_LOCAL_USER,
-    POSTGRES_LOCAL_PASSWORD,
-    POSTGRES_LOCAL_HOST,
-    POSTGRES_LOCAL_PORT,
-    POSTGRES_LOCAL_DB
-)
-
-
-def get_engine():
-    """Crear engine de SQLAlchemy con connection string de PostgreSQL."""
-    db_url = (
-        f"postgresql+psycopg2://{POSTGRES_LOCAL_USER}:{POSTGRES_LOCAL_PASSWORD}"
-        f"@{POSTGRES_LOCAL_HOST}:{POSTGRES_LOCAL_PORT}/{POSTGRES_LOCAL_DB}"
-    )
-    return create_engine(db_url)
-
-
-def create_features_schema_and_tables(engine):
-    """
-    Crea el schema 'features' y todas las tablas leyendo desde archivo SQL.
-    """
-    # Obtener la ruta al archivo SQL
-    sql_file = Path(__file__).parent.parent.parent / "sql" / "create_features_schema.sql"
-    
-    if not sql_file.exists():
-        raise FileNotFoundError(
-            f"No se encontró el archivo SQL: {sql_file}\n"
-            f"Asegúrate de haber creado el archivo en: sql/create_features_schema.sql"
-        )
-    
-    print(f"Leyendo DDL desde: {sql_file}")
-    
-    # Leer el contenido del archivo SQL
-    with open(sql_file, 'r', encoding='utf-8') as f:
-        ddl_statements = f.read()
-    
-    # Ejecutar las sentencias DDL
-    with engine.begin() as conn:
-        conn.exec_driver_sql(ddl_statements)
-    
-    print("Schema 'features' y tablas creadas/recreadas desde archivo SQL")
+from chicago_rstrips.db_loader import get_engine, run_ddl, load_dataframe_to_postgres
 
 
 def save_weather_stations(points_gdf, engine):
@@ -62,24 +19,23 @@ def save_weather_stations(points_gdf, engine):
     # Preparar DataFrame para PostgreSQL
     df = pd.DataFrame({
         'station_id': points_gdf['station_id'],
-        'station_name': points_gdf['station_id'],  # O un nombre más descriptivo
+        'station_name': points_gdf['station_id'],
         'longitude': points_gdf.geometry.x,
         'latitude': points_gdf.geometry.y,
-        'geometry_wkt': points_gdf.geometry.to_wkt(),  # Formato WKT
+        'geometry_wkt': points_gdf.geometry.to_wkt(),
         'crs': 'EPSG:4326'
     })
     
-    df.to_sql(
-        name='dim_weather_stations',
+    # Cargar usando función centralizada
+    load_dataframe_to_postgres(
+        df,
+        table_name='dim_weather_stations',
         schema='features',
-        con=engine,
-        if_exists='append',  # ← CAMBIO: append en lugar de replace
-        index=False,
-        method='multi'
+        engine=engine,
+        if_exists='append'
     )
-    print(f"✓ {len(df)} estaciones meteorológicas guardadas en features.dim_weather_stations")
     
-    # Guardar también en parquet
+    # Guardar backup en parquet
     features_dir = get_data_dir() / "features" / "geospatial"
     features_dir.mkdir(parents=True, exist_ok=True)
     df.to_parquet(features_dir / "weather_stations.parquet", index=False)
@@ -110,21 +66,19 @@ def save_voronoi_zones(voronoi_gdf, engine):
         'crs': 'EPSG:4326'
     })
     
-    # CAMBIO: Usar 'append'
-    df.to_sql(
-        name='dim_voronoi_zones',
+    # Cargar usando función centralizada
+    load_dataframe_to_postgres(
+        df,
+        table_name='dim_voronoi_zones',
         schema='features',
-        con=engine,
-        if_exists='append',  # ← CAMBIO
-        index=False,
-        method='multi'
+        engine=engine,
+        if_exists='append'
     )
-    print(f"✓ {len(df)} zonas de Voronoi guardadas en features.dim_voronoi_zones")
     
     # Guardar backup en parquet
     features_dir = get_data_dir() / "features" / "geospatial"
     df.to_parquet(features_dir / "voronoi_zones.parquet", index=False)
-    print(f"Backup guardado en {features_dir / 'voronoi_zones.parquet'}")
+    print(f"✓ Backup guardado en {features_dir / 'voronoi_zones.parquet'}")
 
 
 def save_city_boundary(city_gdf, engine):
@@ -146,21 +100,20 @@ def save_city_boundary(city_gdf, engine):
     # Preparar DataFrame
     df = pd.DataFrame({
         'city_name': ['Chicago'],
-        'geometry_wkt': [city_gdf.geometry.unary_union.wkt],  # Unir todos los polígonos
+        'geometry_wkt': [city_gdf.geometry.unary_union.wkt],
         'area_km2': [round(area_km2, 2)],
         'crs': ['EPSG:4326'],
         'source_url': ['https://data.cityofchicago.org/resource/qqq8-j68g.geojson']
     })
     
-    # CAMBIO: Usar 'append'
-    df.to_sql(
-        name='ref_city_boundary',
+    # Cargar usando función centralizada
+    load_dataframe_to_postgres(
+        df,
+        table_name='ref_city_boundary',
         schema='features',
-        con=engine,
-        if_exists='append',  # ← CAMBIO
-        index=False
+        engine=engine,
+        if_exists='append'
     )
-    print(f"✓ Límite de Chicago guardado en features.ref_city_boundary")
     
     # Guardar backup
     features_dir = get_data_dir() / "features" / "geospatial"
@@ -168,15 +121,26 @@ def save_city_boundary(city_gdf, engine):
     print(f"✓ Backup guardado en {features_dir / 'chicago_city_boundary.parquet'}")
 
 
-def load_all_geospatial_features(points_gdf, voronoi_gdf, city_gdf):
+def load_all_geospatial_features(points_gdf=None, voronoi_gdf=None, city_gdf=None):
     """
     Función principal para cargar todas las features geoespaciales.
     
+    Si no se pasan los GeoDataFrames, los genera usando chicago_voronoi_zones.
+    
     Args:
-        points_gdf: GeoDataFrame de estaciones meteorológicas
-        voronoi_gdf: GeoDataFrame de zonas de Voronoi
-        city_gdf: GeoDataFrame del límite de Chicago
+        points_gdf: GeoDataFrame de estaciones meteorológicas (opcional)
+        voronoi_gdf: GeoDataFrame de zonas de Voronoi (opcional)
+        city_gdf: GeoDataFrame del límite de Chicago (opcional)
     """
+    # Si no se pasan los GeoDataFrames, generarlos
+    if points_gdf is None or voronoi_gdf is None or city_gdf is None:
+        print("📦 Generando features geoespaciales...")
+        from chicago_rstrips.chicago_voronoi_zones import generate_all_geospatial_features
+        features = generate_all_geospatial_features()
+        city_gdf = features['city']
+        points_gdf = features['stations']
+        voronoi_gdf = features['zones']
+    
     engine = get_engine()
     
     try:
@@ -184,7 +148,7 @@ def load_all_geospatial_features(points_gdf, voronoi_gdf, city_gdf):
         print("\n" + "="*60)
         print("CREANDO SCHEMA Y TABLAS DESDE ARCHIVO SQL")
         print("="*60)
-        create_features_schema_and_tables(engine)
+        run_ddl(engine, "create_features_schema.sql")
         
         # 2. Cargar datos (ahora las tablas tienen PKs, FKs, constraints, etc.)
         print("\n" + "="*60)
@@ -193,15 +157,6 @@ def load_all_geospatial_features(points_gdf, voronoi_gdf, city_gdf):
         save_weather_stations(points_gdf, engine)
         save_voronoi_zones(voronoi_gdf, engine)
         save_city_boundary(city_gdf, engine)
-        
-        # # 3. Verificar la carga con la función helper
-        # print("\n" + "="*60)
-        # print("ESTADÍSTICAS DE FEATURES CARGADAS")
-        # print("="*60)
-        # with engine.connect() as conn:
-        #     result = conn.execute(text("SELECT * FROM features.get_features_stats()"))
-        #     for row in result:
-        #         print(f"  • {row[0]}: {row[1]} registros (última actualización: {row[2]})")
         
         print("\n✅ Todas las features geoespaciales fueron cargadas exitosamente")
         
@@ -214,14 +169,6 @@ def load_all_geospatial_features(points_gdf, voronoi_gdf, city_gdf):
 
 # Para testing independiente
 if __name__ == "__main__":
-    from chicago_rstrips.chicago_voronoi_zones import (
-        city_poly_gdf,
-        points_gdf,
-        voronoi_con_id
-    )
-    
-    load_all_geospatial_features(
-        points_gdf=points_gdf,
-        voronoi_gdf=voronoi_con_id,
-        city_gdf=city_poly_gdf
-    )
+    # Ahora NO necesita importar los GeoDataFrames específicos
+    # La función se encarga de generarlos si no se pasan
+    load_all_geospatial_features()

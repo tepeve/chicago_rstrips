@@ -1,6 +1,7 @@
 from chicago_rstrips.socrata_api_client import fetch_data_from_api
 from chicago_rstrips.config import START_DATE, END_DATE
 from chicago_rstrips.utils import get_raw_data_dir
+from chicago_rstrips.location_dimension import build_location_dimension, map_location_keys, update_location_dimension
 import pandas as pd
 
 # Definir la query SoQL
@@ -18,6 +19,38 @@ WHERE
   AND percent_time_chicago = 1
   LIMIT 100
 """
+
+type_mapping = {
+    # IDs y strings
+    'trip_id': 'string',
+    
+    # Timestamps
+    'trip_start_timestamp': 'datetime64[ns]',
+    'trip_end_timestamp': 'datetime64[ns]',
+    
+    # Numéricos enteros
+    'trip_seconds': 'Int64',  # Nullable integer
+    'pickup_community_area': 'Int64',
+    'dropoff_community_area': 'Int64',
+    'trips_pooled': 'Int64',
+    
+    # Numéricos decimales
+    'trip_miles': 'float64',
+    'percent_time_chicago': 'float64',
+    'percent_distance_chicago': 'float64',
+    'fare': 'float64',
+    'tip': 'float64',
+    'additional_charges': 'float64',
+    'trip_total': 'float64',
+    
+    # Booleanos
+    'shared_trip_authorized': 'boolean',
+    
+    # Geolocation (mantener como string o parsear JSON)
+    'pickup_centroid_location': 'string',
+    'dropoff_centroid_location': 'string',
+}
+
 def transform_data_types(df):
     """
     Convierte los tipos de datos del DataFrame a los tipos correctos.
@@ -29,36 +62,6 @@ def transform_data_types(df):
         pd.DataFrame: DataFrame con tipos corregidos
     """
     # Definir el esquema de tipos
-    type_mapping = {
-        # IDs y strings
-        'trip_id': 'string',
-        
-        # Timestamps
-        'trip_start_timestamp': 'datetime64[ns]',
-        'trip_end_timestamp': 'datetime64[ns]',
-        
-        # Numéricos enteros
-        'trip_seconds': 'Int64',  # Nullable integer
-        'pickup_community_area': 'Int64',
-        'dropoff_community_area': 'Int64',
-        'trips_pooled': 'Int64',
-        
-        # Numéricos decimales
-        'trip_miles': 'float64',
-        'percent_time_chicago': 'float64',
-        'percent_distance_chicago': 'float64',
-        'fare': 'float64',
-        'tip': 'float64',
-        'additional_charges': 'float64',
-        'trip_total': 'float64',
-        
-        # Booleanos
-        'shared_trip_authorized': 'boolean',
-        
-        # Geolocation (mantener como string o parsear JSON)
-        'pickup_centroid_location': 'string',
-        'dropoff_centroid_location': 'string',
-    }
     
     # Aplicar conversiones
     for col, dtype in type_mapping.items():
@@ -95,7 +98,10 @@ def transform_data_types(df):
     return df
 
 
-def extract_trips_data(output_filename="raw_trips_data.parquet"):
+def extract_trips_data(output_filename="raw_trips_data.parquet",
+                       build_locations: bool = False,
+                       locations_strategy: str = "incremental",  # 'incremental' | 'rebuild'
+                       locations_filename: str = "centroid_locations.parquet"):
     """
     Extrae datos de trips y los guarda en formato parquet.
     
@@ -117,15 +123,41 @@ def extract_trips_data(output_filename="raw_trips_data.parquet"):
         df = transform_data_types(df)
         print("Tipos de datos después de transformación:")
         print(df.dtypes)
-        
+
+        print("\n--- Aplicando filtro para dejar solamente las columnas que definimos en type_mapping ---")
+        print(f"Columnas antes del filtro: {list(df.columns)}")
+        api_columns_to_keep = list(type_mapping.keys())
+        df = df[api_columns_to_keep]
+        print(f"Columnas después del filtro: {list(df.columns)}")
+
         print("\n--- Vista previa del DataFrame ---")
         print(df.head())
         
         # Construir path usando utils
-        output_path = get_raw_data_dir() / output_filename
-        df.to_parquet(output_path, index=False)
-        print(f"Datos guardados en {output_path}")
-        return str(output_path)
+        raw_dir = get_raw_data_dir()
+        trips_path = raw_dir / output_filename
+
+        if build_locations:
+            loc_path = raw_dir / locations_filename
+            if locations_strategy == "rebuild" or not loc_path.exists():
+                dim_df, mapping = build_location_dimension(df)
+            else:
+                existing_dim = pd.read_parquet(loc_path) if loc_path.exists() else None
+                dim_df, mapping = update_location_dimension(existing_dim, df)
+            trips_df = map_location_keys(df, mapping)
+
+
+            trips_df.to_parquet(trips_path, index=False)
+            dim_df.to_parquet(loc_path, index=False)
+            print(f"Parquet viajes (sin geometrías): {trips_path}")
+            print(f"Parquet dimensión ubicaciones: {loc_path}")
+        else:
+            # Guardar dataset crudo con geometrías intactas
+            df.to_parquet(trips_path, index=False)
+            print(f"Parquet viajes (crudo con geometrías): {trips_path}")
+
+        return str(trips_path)
+        
     else:
         print("No se encontraron datos para guardar.")
         return None

@@ -1,9 +1,13 @@
 from airflow.decorators import dag, task
 from pendulum import datetime
 
-from chicago_rstrips.chicago_voronoi_zones import generate_all_geospatial_features
 from chicago_rstrips.load_geospatial_features import load_all_geospatial_features, get_engine
 from chicago_rstrips.utils import get_outputs_dir
+
+
+# ====================================================================
+# DAG: Carga de features estáticas
+# ====================================================================
 
 
 @dag(
@@ -22,60 +26,30 @@ def static_features_setup():
     """
     DAG que orquesta la carga de features estáticas.
     
-    Por ahora incluye:
-    - chicago_voronoi_zones.generate_all_geospatial_features() → Generar geometrías
-    - load_geospatial_features.load_all_geospatial_features() → Cargar a PostgreSQL (con DDL robusto)
+    Ahora simplificado: load_all_geospatial_features() se encarga de:
+    - Generar features (si no se pasan como parámetros)
+    - Ejecutar DDL completo desde SQL
+    - Crear schema, tablas, PKs, FKs, constraints
+    - Cargar los datos
+    - Crear vistas
+    - Guardar backups en parquet
     """
 
     @task
-    def generate_spatial_features():
+    def load_to_postgres():
         """
-        Genera todas las features geoespaciales usando el script modular.
+        Carga features a PostgreSQL.
         
-        Returns:
-            dict: Diccionario serializable con los datos para XCom
+        Esta función ahora encapsula TODO el proceso:
+        - Genera features automáticamente
+        - Ejecuta DDL
+        - Carga datos
+        - Crea backups
         """
-        print("🗺️  Generando features geoespaciales...")
+        print("💾 Cargando features geoespaciales a PostgreSQL...")
         
-        features = generate_all_geospatial_features()
-        
-        # Convertir GeoDataFrames a diccionarios para XCom
-        # (Airflow no puede serializar GeoDataFrames directamente)
-        return {
-            'city_count': len(features['city']),
-            'stations_count': len(features['stations']),
-            'zones_count': len(features['zones']),
-            'success': True
-        }
-
-    @task
-    def load_to_postgres(generation_result: dict):
-        """
-        Carga features a PostgreSQL usando la función robusta existente.
-        
-        Esta función:
-        - Ejecuta el DDL completo desde SQL
-        - Crea schema, tablas, PKs, FKs, constraints
-        - Carga los datos
-        - Crea vistas
-        
-        Args:
-            generation_result: Resultado del task anterior (para dependencia)
-        """
-        print("💾 Cargando features a PostgreSQL...")
-        
-        if not generation_result.get('success'):
-            raise ValueError("Generación de features falló")
-        
-        # Re-generar features (no podemos pasar GeoDataFrames por XCom)
-        features = generate_all_geospatial_features()
-        
-        # Usar la función ROBUSTA que ya tienes
-        load_all_geospatial_features(
-            points_gdf=features['stations'],
-            voronoi_gdf=features['zones'],
-            city_gdf=features['city']
-        )
+        # Esta función ahora se encarga de TODO
+        load_all_geospatial_features()
         
         print("✅ Features cargadas exitosamente")
 
@@ -102,7 +76,9 @@ def static_features_setup():
                     result = conn.execute(text(f"SELECT COUNT(*) FROM {table}"))
                     count = result.fetchone()[0]
                     
-                    assert count == expected_count, f"{table}: esperaba {expected_count}, encontró {count}"
+                    if count != expected_count:
+                        raise ValueError(f"{table}: esperaba {expected_count}, encontró {count}")
+                    
                     print(f"✓ {table}: {count} registros")
                 
                 # Verificar vista
@@ -128,6 +104,7 @@ def static_features_setup():
         report = {
             'timestamp': dt.now().isoformat(),
             'dag_id': 'static_features_setup',
+            'status': 'success',
             'features': {}
         }
         
@@ -157,13 +134,13 @@ def static_features_setup():
             engine.dispose()
 
     # ====================================================================
-    # FLUJO DEL DAG
+    # FLUJO DEL DAG (SIMPLIFICADO)
     # ====================================================================
-    generation_result = generate_spatial_features()
-    load_task = load_to_postgres(generation_result)
+    load_task = load_to_postgres()
     verify_task = verify_load()
     report_task = generate_report()
     
+    # Flujo lineal: cargar → verificar → reportar
     load_task >> verify_task >> report_task
 
 

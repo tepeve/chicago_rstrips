@@ -32,14 +32,17 @@ def get_outputs_dir():
     outputs_dir.mkdir(exist_ok=True)
     return outputs_dir
 
+def get_features_dir():
+    """Obtiene el directorio de features, creándolo si no existe."""
+    features_dir = get_data_dir() / "features"
+    features_dir.mkdir(exist_ok=True)
+    return features_dir
 
-
-def get_outputs_dir():
-    """Obtiene el directorio de datos, creándolo si no existe."""
-    outputs_dir = get_project_root() / "outputs"
-    outputs_dir.mkdir(exist_ok=True)
-    return outputs_dir
-
+def get_geospatial_features_dir():
+    """Obtiene el directorio de features geoespaciales, creándolo si no existe."""
+    geo_dir = get_features_dir() / "geospatial"
+    geo_dir.mkdir(exist_ok=True)
+    return geo_dir
 
 # ============================================================
 # Funciones para consultas geoespaciales

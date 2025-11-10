@@ -2,7 +2,6 @@ import geopandas as gpd
 from shapely import voronoi_polygons, unary_union
 from chicago_rstrips.utils import get_outputs_dir
 import matplotlib.pyplot as plt
-import os
 
 
 def generate_city_boundary():
@@ -142,10 +141,8 @@ def save_visualization(city_gdf, points_gdf, voronoi_gdf):
         print("⚠️  matplotlib no instalado, omitiendo visualización")
 
 
-# Ejecución standalone
+# Ejecución standalone (solo para generar y visualizar, NO persiste)
 if __name__ == "__main__":
-    from chicago_rstrips.load_geospatial_features import load_all_geospatial_features
-    
     # Generar features
     features = generate_all_geospatial_features()
     
@@ -156,16 +153,5 @@ if __name__ == "__main__":
         features['zones']
     )
     
-    # Persistir en PostgreSQL
-    print("\n" + "="*60)
-    print("PERSISTIENDO EN POSTGRESQL")
-    print("="*60)
-    
-    try:
-        load_all_geospatial_features(
-            points_gdf=features['stations'],
-            voronoi_gdf=features['zones'],
-            city_gdf=features['city']
-        )
-    except Exception as e:
-        print(f"⚠️  Error al persistir: {e}")
+    print("\n💡 Para persistir en PostgreSQL, ejecuta:")
+    print("   python -m chicago_rstrips.load_geospatial_features")
