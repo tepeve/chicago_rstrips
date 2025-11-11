@@ -67,12 +67,6 @@ def transform_data_types(df):
                 if dtype.startswith('datetime'):
                     df[col] = pd.to_datetime(df[col], errors='coerce')
                 
-                elif dtype == 'boolean':
-                    # 1. Mapear valores string
-                    map_dict = {'true': True, 'false': False, True: True, False: False}
-                    # 2. Convertir a tipo 'boolean' nullable para manejar nulos
-                    df[col] = df[col].map(map_dict).astype('boolean')
-                
                 elif dtype == 'Int64':
                     # Nullable integer (maneja NaN/None)
                     df[col] = pd.to_numeric(df[col], errors='coerce').astype('Int64')
