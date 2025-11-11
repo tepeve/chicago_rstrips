@@ -1,10 +1,12 @@
 from airflow.decorators import dag, task
 from pendulum import datetime
+from chicago_rstrips.utils import get_outputs_dir, get_raw_data_dir
 
 from chicago_rstrips.extract_raw_trips_data import extract_trips_data
-from chicago_rstrips.load_raw_trips_data import load_trip_data_to_postgres
-from chicago_rstrips.load_centroid_locations import load_centroid_locations_to_postgres
-from chicago_rstrips.utils import get_outputs_dir, get_raw_data_dir
+from chicago_rstrips.extract_traffic_data import extract_traffic_data
+
+from chicago_rstrips.load_facts_to_staging import load_trip_data_to_postgres, load_traffic_data_to_postgres
+from chicago_rstrips.load_locations import load_trips_locations_to_postgres, load_traffic_regions_to_postgres
 
 
 @dag(
@@ -13,7 +15,7 @@ from chicago_rstrips.utils import get_outputs_dir, get_raw_data_dir
     schedule=None,
     catchup=False,
     tags=["etl", "trips", "incremental"],
-    description="Pipeline ETL para viajes de Chicago con dimensión de ubicaciones",
+    description="Pipeline ETL para viajes y tráfico de Chicago",
     default_args={
         "owner": "tepeve",
         "retries": 1,
@@ -22,16 +24,18 @@ from chicago_rstrips.utils import get_outputs_dir, get_raw_data_dir
 def etl_pipeline():
     """
     Pipeline ETL completo para datos de trips:
-    1. Extrae datos de la API Socrata
+    1. Extrae datos trips de la API Socrata
     2. Construye/actualiza dimensión de ubicaciones
     3. Carga trips a staging
     4. Carga dimensión de ubicaciones
-    5. Verifica integridad
-    6. Genera reporte
+    5. Extrae datos trafico de la API Socrata
+    6. Carga datos de tráfico a staging
+    7. Verifica integridad
+    8. Genera reporte
     """
 
     @task
-    def extract():
+    def extract_trips():
         """
         Extrae datos de trips y construye dimensión de ubicaciones.
         
@@ -39,13 +43,16 @@ def etl_pipeline():
             dict: Rutas de archivos generados
         """
         print("📥 Extrayendo datos de trips desde Socrata API...")
-        
+
+        build_locations = True  # genera dim_centroid_location
+        locations_strategy = "rebuild"  # opciones: 'incremental' | 'rebuild'
+ 
         # CAMBIO IMPORTANTE: Ahora genera AMBOS archivos
         trips_path = extract_trips_data(
             output_filename="raw_trips_data.parquet",
-            build_locations=True,  # ← NUEVO: genera dim_centroid_location
-            locations_strategy="incremental",  # ← NUEVO: actualiza incrementalmente
-            locations_filename="centroid_locations.parquet"
+            build_locations=build_locations, 
+            locations_strategy=locations_strategy,
+            locations_filename="trips_locations.parquet"
         )
         
         if not trips_path:
@@ -53,14 +60,16 @@ def etl_pipeline():
         
         # Construir path de locations
         raw_dir = get_raw_data_dir()
-        locations_path = str(raw_dir / "centroid_locations.parquet")
+        locations_path = str(raw_dir / "trips_locations.parquet")
         
         print(f"✓ Trips extraídos: {trips_path}")
         print(f"✓ Locations generadas: {locations_path}")
         
         return {
             'trips_path': trips_path,
-            'locations_path': locations_path
+            'locations_path': locations_path,
+            'build_locations': build_locations,
+            'locations_strategy': locations_strategy            
         }
 
     @task
@@ -76,7 +85,7 @@ def etl_pipeline():
         success = load_trip_data_to_postgres(
             parquet_path=paths['trips_path'],
             table_name="stg_raw_trips",
-            ddl_path="create_stg_raw_trips.sql"
+            ddl_path="create_staging_schema.sql"
         )
         
         if not success:
@@ -95,10 +104,10 @@ def etl_pipeline():
         """
         print("💾 Cargando dimensión de ubicaciones a PostgreSQL...")
         
-        success = load_centroid_locations_to_postgres(
+        success = load_trips_locations_to_postgres(
             parquet_path=paths['locations_path'],
-            table_name="dim_centroid_location",
-            ddl_path="create_dim_location_schema.sql"
+            table_name="trips_locations",
+            ddl_path="create_dim_spatial_schema.sql"
         )
         
         if not success:
@@ -106,6 +115,93 @@ def etl_pipeline():
         
         print("✓ Dimensión de ubicaciones cargada exitosamente")
         return paths
+    
+    
+    @task
+    def extract_traffic():
+        """
+        Extrae datos de trafico y construye dimensión de regiones de tráfico.
+        
+        Returns:
+            dict: Rutas de archivos generados
+        """
+        print("📥 Extrayendo datos de tráfico desde Socrata API...")
+
+        build_regions = True  # genera dim_centroid_location
+        regions_strategy = "rebuild"  # opciones: 'incremental' | 'rebuild'
+ 
+        traffic_path = extract_traffic_data(
+            output_filename="stg_raw_traffic.parquet",
+            build_regions=build_regions, 
+            regions_strategy=regions_strategy,
+            traffic_regions_filename="traffic_regions.parquet"
+        )
+        
+        if not traffic_path:
+            raise ValueError("No se pudo extraer datos de tráfico")
+        
+        # Construir path de locations
+        raw_dir = get_raw_data_dir()
+        traffic_regions_path = str(raw_dir / "traffic_regions.parquet")
+        
+        print(f"✓ Trips extraídos: {traffic_path}")
+        print(f"✓ Locations generadas: {traffic_regions_path}")
+        
+        return {
+            'traffic_path': traffic_path,
+            'traffic_regions_path': traffic_regions_path,
+            'build_regions': build_regions,
+            'regions_strategy': regions_strategy            
+        }
+    
+    @task
+    def load_traffic(paths: dict):
+        """
+        Carga datos de traffic a staging.stg_raw_traffic.
+        
+        Args:
+            paths: Diccionario con rutas de archivos
+        """
+        print("💾 Cargando traffic a PostgreSQL...")
+        
+        success = load_traffic_data_to_postgres(
+            parquet_path=paths['traffic_path'],
+            table_name="stg_raw_traffic",
+            ddl_path="create_staging_schema.sql"
+        )
+        
+        if not success:
+            raise ValueError("Error al cargar trips a PostgreSQL")
+        
+        print("✓ Trips cargados exitosamente")
+        return paths
+
+    @task
+    def load_traffic_regions(paths: dict):
+        """
+        Carga dimensión de regiones
+        
+        Args:
+            paths: Diccionario con rutas de archivos
+        """
+        print("💾 Cargando dimensión de regiones a PostgreSQL...")
+        
+        success = load_traffic_regions_to_postgres(
+            parquet_path=paths['traffic_regions_path'],
+            table_name="traffic_regions",
+            ddl_path="create_dim_spatial_schema.sql"
+        )
+        
+        if not success:
+            raise ValueError("Error al cargar dimensión de regiones")
+        
+        print("✓ Dimensión de regiones cargada exitosamente")
+        return paths
+
+    @task
+    def combine_paths(trips_paths: dict, traffic_paths: dict) -> dict:
+        """Combina los diccionarios de paths de trips y traffic."""
+        return {**trips_paths, **traffic_paths}
 
     @task
     def verify_load(paths: dict):
@@ -121,12 +217,12 @@ def etl_pipeline():
         try:
             with engine.connect() as conn:
                 # 1. Contar trips
-                result = conn.execute(text("SELECT COUNT(*) FROM staging.stg_raw_trips"))
+                result = conn.execute(text("SELECT COUNT(*) FROM staging.stg_tra_trips"))
                 trips_count = result.fetchone()[0]
                 print(f"✓ Trips en staging: {trips_count}")
                 
                 # 2. Contar ubicaciones
-                result = conn.execute(text("SELECT COUNT(*) FROM dimlocation.dim_centroid_location"))
+                result = conn.execute(text("SELECT COUNT(*) FROM dim_spatial.trips_locations"))
                 locations_count = result.fetchone()[0]
                 print(f"✓ Ubicaciones en dimensión: {locations_count}")
                 
@@ -136,13 +232,13 @@ def etl_pipeline():
                     WHERE 
                         (t.pickup_location_id IS NOT NULL 
                          AND NOT EXISTS (
-                            SELECT 1 FROM dimlocation.dim_centroid_location d 
+                            SELECT 1 FROM dim_spatial.trips_locations d 
                             WHERE d.location_id = t.pickup_location_id
                          ))
                         OR 
                         (t.dropoff_location_id IS NOT NULL 
                          AND NOT EXISTS (
-                            SELECT 1 FROM dimlocation.dim_centroid_location d 
+                            SELECT 1 FROM dim_spatial.trips_locations d 
                             WHERE d.location_id = t.dropoff_location_id
                          ))
                 """)
@@ -156,7 +252,7 @@ def etl_pipeline():
                 
                 # 4. Verificar que hay coordenadas parseadas
                 result = conn.execute(text("""
-                    SELECT COUNT(*) FROM dimlocation.dim_centroid_location 
+                    SELECT COUNT(*) FROM dim_spatial.trips_locations 
                     WHERE longitude IS NOT NULL AND latitude IS NOT NULL
                 """))
                 parsed = result.fetchone()[0]
@@ -169,7 +265,9 @@ def etl_pipeline():
                     'trips_count': trips_count,
                     'locations_count': locations_count,
                     'orphans': orphans,
-                    'parsed_locations': parsed
+                    'parsed_locations': parsed,
+                    'build_locations': paths.get('build_locations'),
+                    'locations_strategy': paths.get('locations_strategy')                    
                 }
                 
         finally:
@@ -193,6 +291,10 @@ def etl_pipeline():
             'data_quality': {
                 'orphaned_locations': verification_result['orphans'],
                 'parse_rate': f"{verification_result['parsed_locations']}/{verification_result['locations_count']}"
+            },
+            'etl_config': {
+                'build_locations': verification_result.get('build_locations'),
+                'locations_strategy': verification_result.get('locations_strategy')
             }
         }
         
@@ -208,17 +310,22 @@ def etl_pipeline():
     # ====================================================================
     # FLUJO DEL DAG
     # ====================================================================
-    # 1. Extraer datos
-    paths = extract()
-    
-    # 2. Cargar en paralelo (trips y locations son independientes)
-    trips_loaded = load_trips(paths)
-    locations_loaded = load_locations(paths)
-    
-    # 3. Verificar después de que ambas cargas terminen
-    verification = verify_load(paths)
-    verification.set_upstream([trips_loaded, locations_loaded])
-    
+    # 1. Extraer y cargar trips y locations
+    trips_paths = extract_trips()
+    locations_loaded = load_locations(trips_paths)
+    trips_loaded = load_trips(trips_paths)
+
+    # 2. Extraer y cargar traffic y regiones (después de trips y locations)
+    traffic_paths = extract_traffic()
+    traffic_loaded = load_traffic(traffic_paths)
+    regions_loaded = load_traffic_regions(traffic_paths)
+
+    # 3. Verificar después de que todas las cargas terminen
+    # Combina los diccionarios para la verificación final
+    all_paths = combine_paths(trips_paths, traffic_paths)
+    verification = verify_load(all_paths)
+    verification.set_upstream([trips_loaded, locations_loaded, traffic_loaded, regions_loaded])
+
     # 4. Generar reporte
     generate_report(verification)
 

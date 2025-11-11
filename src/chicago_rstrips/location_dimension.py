@@ -2,6 +2,8 @@ import hashlib
 import json
 import re
 import pandas as pd
+import ast
+
 
 POINT_WKT_RE = re.compile(r"POINT\s*\(\s*([-\d\.]+)\s+([-\d\.]+)\s*\)", re.IGNORECASE)
 PAIR_RE = re.compile(r"\(\s*([-\d\.]+)\s*,\s*([-\d\.]+)\s*\)")
@@ -21,8 +23,25 @@ def _parse_lon_lat(value):
             lat = obj.get("latitude") or obj.get("lat")
             if lon is not None and lat is not None:
                 return float(lon), float(lat)
+            # NUEVO: Si es GeoJSON
+            if obj.get("type") == "Point" and isinstance(obj.get("coordinates"), list):
+                lon, lat = obj["coordinates"][:2]
+                return float(lon), float(lat)
     except Exception:
-        pass
+        # Intentar con ast.literal_eval si json falla
+        try:
+            obj = ast.literal_eval(s)
+            if isinstance(obj, dict):
+                lon = obj.get("longitude") or obj.get("lon")
+                lat = obj.get("latitude") or obj.get("lat")
+                if lon is not None and lat is not None:
+                    return float(lon), float(lat)
+                # Si es GeoJSON
+                if obj.get("type") == "Point" and isinstance(obj.get("coordinates"), list):
+                    lon, lat = obj["coordinates"][:2]
+                    return float(lon), float(lat)
+        except Exception:
+            pass
     m = POINT_WKT_RE.search(s)
     if m:
         return float(m.group(1)), float(m.group(2))

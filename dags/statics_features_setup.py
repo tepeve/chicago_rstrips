@@ -67,9 +67,9 @@ def static_features_setup():
             with engine.connect() as conn:
                 # Verificar conteos
                 tables = {
-                    'features.dim_weather_stations': 4,  # Esperamos 4 estaciones
-                    'features.dim_voronoi_zones': 4,
-                    'features.ref_city_boundary': 1
+                    'dim_spatial.weather_stations_points': 4,  # Esperamos 4 estaciones
+                    'dim_spatial.weather_voronoi_zones': 4,
+                    'dim_spatial.chicago_city_boundary': 1
                 }
                 
                 for table, expected_count in tables.items():
@@ -82,7 +82,7 @@ def static_features_setup():
                     print(f"✓ {table}: {count} registros")
                 
                 # Verificar vista
-                result = conn.execute(text("SELECT COUNT(*) FROM features.vw_stations_with_zones"))
+                result = conn.execute(text("SELECT COUNT(*) FROM dim_spatial.vw_stations_with_zones"))
                 view_count = result.fetchone()[0]
                 print(f"✓ Vista combinada: {view_count} registros")
                 
@@ -111,9 +111,9 @@ def static_features_setup():
         try:
             with engine.connect() as conn:
                 tables = [
-                    'features.dim_weather_stations',
-                    'features.dim_voronoi_zones',
-                    'features.ref_city_boundary'
+                    'dim_spatial.weather_stations_points',
+                    'dim_spatial.weather_voronoi_zones',
+                    'dim_spatial.chicago_city_boundary'
                 ]
                 
                 for table in tables:

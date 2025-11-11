@@ -1,10 +1,13 @@
 from chicago_rstrips.socrata_api_client import fetch_data_from_api
-from chicago_rstrips.config import START_DATE, END_DATE
+from chicago_rstrips.config import START_DATE, END_DATE, CHIC_TNP_API_URL
 from chicago_rstrips.utils import get_raw_data_dir
 from chicago_rstrips.location_dimension import build_location_dimension, map_location_keys, update_location_dimension
 import pandas as pd
 
-# Definir la query SoQL
+# Defino el endpoint de la API
+api_endpoint = CHIC_TNP_API_URL
+
+# Defino la query SoQL
 soql_query = f"""
 SELECT
   trip_id, trip_start_timestamp, trip_end_timestamp, trip_seconds, 
@@ -19,6 +22,7 @@ WHERE
   AND percent_time_chicago = 1
   LIMIT 100
 """
+
 
 type_mapping = {
     # IDs y strings
@@ -112,7 +116,7 @@ def extract_trips_data(output_filename="raw_trips_data.parquet",
         Path: Ruta del archivo guardado o None si no hay datos
     """
     # Llamar a la función para obtener los datos
-    df = fetch_data_from_api(soql_query)
+    df = fetch_data_from_api(soql_query,api_endpoint)
     
     # Convertir a parquet y almacenar en una base de datos si hay datos
     if df is not None:

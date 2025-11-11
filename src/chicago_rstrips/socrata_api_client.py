@@ -1,9 +1,9 @@
 import pandas as pd
 import requests
 import json
-from chicago_rstrips.config import CHIC_TNP_API_URL, SOCRATA_APP_TOKEN
+from chicago_rstrips.config import SOCRATA_APP_TOKEN
 
-def fetch_data_from_api(soql_query):
+def fetch_data_from_api(soql_query,api_endpoint):
     """
     Fetch data from the Socrata API using a SoQL query.
 
@@ -21,9 +21,9 @@ def fetch_data_from_api(soql_query):
 
     payload = {"query": soql_query}
 
-    print(f"Realizando solicitud POST a: {CHIC_TNP_API_URL}")
+    print(f"Realizando solicitud POST a: {api_endpoint}")
     try:
-        response = requests.post(CHIC_TNP_API_URL, headers=headers, json=payload)
+        response = requests.post(api_endpoint, headers=headers, json=payload)
         response.raise_for_status()
 
         results = response.json()

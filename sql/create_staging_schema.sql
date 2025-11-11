@@ -8,12 +8,13 @@
 CREATE SCHEMA IF NOT EXISTS staging;
 
 -- ============================================================
--- 2. ELIMINAR TABLAS EXISTENTES (en orden correcto por FKs)
+-- ELIMINAR TABLAS EXISTENTES (en orden correcto por FKs)
 -- ============================================================
 DROP TABLE IF EXISTS staging.stg_raw_trips CASCADE;
+DROP TABLE IF EXISTS staging.stg_raw_traffic CASCADE;
 
 -- ============================================================
--- 3. TABLA: Staging de Viajes Crudos
+-- TABLA: Staging de Viajes
 -- ============================================================
 CREATE TABLE IF NOT EXISTS staging.stg_raw_trips (
     trip_id VARCHAR(50) PRIMARY KEY,
@@ -47,3 +48,24 @@ CREATE INDEX IF NOT EXISTS idx_stg_raw_trips_community ON staging.stg_raw_trips(
 COMMENT ON TABLE staging.stg_raw_trips IS 'Staging de datos crudos de viajes sin geometrías. Las ubicaciones están normalizadas en dim.dim_centroid_location';
 COMMENT ON COLUMN staging.stg_raw_trips.pickup_location_id IS 'FK a dim.dim_centroid_location (hash SHA1 truncado)';
 COMMENT ON COLUMN staging.stg_raw_trips.dropoff_location_id IS 'FK a dim.dim_centroid_location (hash SHA1 truncado)';
+
+
+-- ============================================================
+-- TABLA: Staging de Tráfico
+-- ============================================================
+CREATE TABLE IF NOT EXISTS staging.stg_raw_traffic (
+    record_id VARCHAR(50) PRIMARY KEY,
+    time TIMESTAMP,
+    speed DOUBLE PRECISION,
+    region_id INTEGER,
+    region VARCHAR(100),
+    description TEXT,
+    bus_count INTEGER,
+    num_reads INTEGER,
+    -- Auditoría
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Índices para mejorar consultas
+CREATE INDEX IF NOT EXISTS stg_raw_traffic_time ON staging.stg_raw_traffic(time);
+CREATE INDEX IF NOT EXISTS stg_raw_traffic_region_id ON staging.stg_raw_traffic(region_id);

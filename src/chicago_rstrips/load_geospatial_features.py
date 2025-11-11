@@ -29,8 +29,8 @@ def save_weather_stations(points_gdf, engine):
     # Cargar usando función centralizada
     load_dataframe_to_postgres(
         df,
-        table_name='dim_weather_stations',
-        schema='features',
+        table_name='weather_stations_points',
+        schema='dim_spatial',
         engine=engine,
         if_exists='append'
     )
@@ -69,8 +69,8 @@ def save_voronoi_zones(voronoi_gdf, engine):
     # Cargar usando función centralizada
     load_dataframe_to_postgres(
         df,
-        table_name='dim_voronoi_zones',
-        schema='features',
+        table_name='weather_voronoi_zones',
+        schema='dim_spatial',
         engine=engine,
         if_exists='append'
     )
@@ -109,8 +109,8 @@ def save_city_boundary(city_gdf, engine):
     # Cargar usando función centralizada
     load_dataframe_to_postgres(
         df,
-        table_name='ref_city_boundary',
-        schema='features',
+        table_name='chicago_city_boundary',
+        schema='dim_spatial',
         engine=engine,
         if_exists='append'
     )
@@ -148,7 +148,7 @@ def load_all_geospatial_features(points_gdf=None, voronoi_gdf=None, city_gdf=Non
         print("\n" + "="*60)
         print("CREANDO SCHEMA Y TABLAS DESDE ARCHIVO SQL")
         print("="*60)
-        run_ddl(engine, "create_features_schema.sql")
+        run_ddl(engine, "create_dim_spatial_schema.sql")
         
         # 2. Cargar datos (ahora las tablas tienen PKs, FKs, constraints, etc.)
         print("\n" + "="*60)
