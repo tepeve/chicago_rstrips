@@ -1,0 +1,7 @@
+
+
+
+
+CREATE SCHEMA IF NOT EXISTS staging;
+
+CREATE SCHEMA IF NOT EXISTS dim_spatial;

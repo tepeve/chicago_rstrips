@@ -1,4 +1,5 @@
 from pathlib import Path
+import pandas as pd
 
 # ============================================================
 ## Funciones para manejar rutas de directorios
@@ -45,6 +46,46 @@ def get_geospatial_features_dir():
     return geo_dir
 
 # ============================================================
+# Funciones para transformar tipos de datos en DataFrames
+# ============================================================
+
+def transform_dataframe_types(df, type_mapping):
+    """
+    Función genérica para convertir tipos de datos de un DataFrame
+    basado en un diccionario de mapeo.
+    
+    Args:
+        df (pd.DataFrame): DataFrame de entrada
+        type_mapping (dict): Diccionario {col_name: dtype_string}
+        
+    Returns:
+        pd.DataFrame: DataFrame con tipos corregidos
+    """
+    for col, dtype in type_mapping.items():
+        if col in df.columns:
+            try:
+                if dtype.startswith('datetime'):
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                
+                elif dtype == 'boolean':
+                    map_dict = {'true': True, 'false': False, True: True, False: False}
+                    df[col] = df[col].map(map_dict).astype('boolean')
+                
+                elif dtype == 'Int64':
+                    df[col] = pd.to_numeric(df[col], errors='coerce').astype('Int64')
+
+                elif dtype == 'float64':
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                elif dtype == 'string':
+                    df[col] = df[col].astype('string')
+                
+            except Exception as e:
+                print(f"Advertencia: No se pudo convertir columna '{col}' a {dtype}: {e}")
+    
+    return df
+
+# ============================================================
 # Funciones para consultas geoespaciales
 # ============================================================
 
@@ -55,7 +96,7 @@ def get_weather_stations():
     Returns:
         pd.DataFrame: DataFrame con información de estaciones
     """
-    from chicago_rstrips.load_geospatial_features import get_engine
+    from chicago_rstrips.load_dim_static_tables import get_engine
     
     engine = get_engine()
     try:
@@ -75,7 +116,7 @@ def get_stations_with_zones():
     Returns:
         pd.DataFrame: DataFrame con estaciones y sus zonas
     """
-    from chicago_rstrips.load_geospatial_features import get_engine
+    from chicago_rstrips.load_dim_static_tables import get_engine
     
     engine = get_engine()
     try:
@@ -101,7 +142,7 @@ def find_zone_for_point(longitude, latitude):
         >>> print(zone)
         'Estacion_A'
     """
-    from chicago_rstrips.load_geospatial_features import get_engine
+    from chicago_rstrips.load_dim_static_tables import get_engine
     
     engine = get_engine()
     

@@ -6,7 +6,7 @@ from chicago_rstrips.utils import get_raw_data_dir
 
 def load_trips_locations_to_postgres(parquet_path=None, 
                                         table_name="trips_locations",
-                                        ddl_path="create_dim_spatial_schema.sql"):
+                                        ddl_path="create_dim_dynamic_tables.sql"):
     """
     Carga la dimensión de ubicaciones desde parquet a PostgreSQL.
     Usa estrategia upsert simple: elimina y recrea.
@@ -55,7 +55,7 @@ def load_trips_locations_to_postgres(parquet_path=None,
 
 def load_traffic_regions_to_postgres(parquet_path=None, 
                                         table_name="traffic_regions",
-                                        ddl_path="create_dim_spatial_schema.sql"):
+                                        ddl_path="create_dim_dynamic_tables.sql"):
     """
     Carga la dimensión de regiones de tráfico desde parquet a PostgreSQL.
     Usa estrategia upsert simple: elimina y recrea.

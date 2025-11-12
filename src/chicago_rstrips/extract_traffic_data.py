@@ -1,8 +1,8 @@
 
-from chicago_rstrips.extract_raw_trips_data import extract_trips_data
+from chicago_rstrips.extract_trips_data import extract_trips_data
 from chicago_rstrips.socrata_api_client import fetch_data_from_api
 from chicago_rstrips.config import START_DATE, END_DATE, CHIC_TRAFFIC_API_URL
-from chicago_rstrips.utils import get_raw_data_dir
+from chicago_rstrips.utils import get_raw_data_dir, transform_dataframe_types
 import geopandas as gpd
 from shapely.geometry import Polygon
 import matplotlib.pyplot as plt
@@ -48,45 +48,6 @@ type_mapping = {
     'south': 'string',
 }
 
-def transform_data_types(df):
-    """
-    Convierte los tipos de datos del DataFrame a los tipos correctos.
-    
-    Args:
-        df (pd.DataFrame): DataFrame con datos de la API
-        
-    Returns:
-        pd.DataFrame: DataFrame con tipos corregidos
-    """
-    # Definir el esquema de tipos
-    
-    # Aplicar conversiones
-    for col, dtype in type_mapping.items():
-        if col in df.columns:
-            try:
-                if dtype.startswith('datetime'):
-                    df[col] = pd.to_datetime(df[col], errors='coerce')
-                
-                elif dtype == 'Int64':
-                    # Nullable integer (maneja NaN/None)
-                    df[col] = pd.to_numeric(df[col], errors='coerce').astype('Int64')
-
-                elif dtype == 'float64':
-                    # *** ARREGLO IMPORTANTE ***
-                    # Usar pd.to_numeric con errors='coerce' para floats
-                    # Esto convierte '12.xx' en NaN
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-                
-                elif dtype == 'string':
-                    # Asignar explícitamente a string
-                    df[col] = df[col].astype('string')
-                
-                # Quitado el 'else' genérico que causaba el error
-
-            except Exception as e:
-                print(f"Advertencia: No se pudo convertir columna '{col}' a {dtype}: {e}")
-    
-    return df
 
 
 def build_location_dimension(df):
@@ -179,7 +140,7 @@ def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
         
         # NUEVO: Transformar tipos de datos
         print("\n--- Transformando tipos de datos ---")
-        df = transform_data_types(df)
+        df = transform_dataframe_types(df,type_mapping)
         print("Tipos de datos después de transformación:")
         print(df.dtypes)
 
@@ -191,7 +152,8 @@ def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
 
         print("\n--- Vista previa del DataFrame ---")
         print(df.head())
-        
+
+       
         # Construir path usando utils
         raw_dir = get_raw_data_dir()
         traffic_data_path = raw_dir / output_filename

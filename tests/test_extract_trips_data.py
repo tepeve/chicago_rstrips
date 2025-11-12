@@ -7,13 +7,14 @@ import tempfile
 import shutil
 
 # Asumimos que estas funciones están en el módulo importado
-from chicago_rstrips.extract_raw_trips_data import transform_data_types, extract_trips_data
+from chicago_rstrips.extract_trips_data import transform_dataframe_types, extract_trips_data
 
 
 class TestTransformDataTypes:
-    """Tests para la función transform_data_types"""
+    """Tests para la función transform_dataframe_types"""
 
     @pytest.fixture
+    @pytest.mark.unit
     def sample_raw_data(self):
         """
         Simula datos como vienen de la API Socrata (todos strings)
@@ -43,6 +44,7 @@ class TestTransformDataTypes:
         })
 
     @pytest.fixture
+    @pytest.mark.unit
     def sample_data_with_nulls(self):
         """
         Simula datos con valores nulos/vacíos para probar el manejo de nullables
@@ -68,6 +70,7 @@ class TestTransformDataTypes:
         })
 
     @pytest.fixture
+    @pytest.mark.unit
     def sample_malformed_data(self):
         """
         NUEVA FIXTURE: Simula datos con valores malformados (camino triste)
@@ -93,6 +96,7 @@ class TestTransformDataTypes:
         })
 
     @pytest.fixture
+    @pytest.mark.unit
     def expected_transformed_data(self, sample_raw_data):
         """
         NUEVA FIXTURE: El "DataFrame Dorado" que esperamos
@@ -122,6 +126,7 @@ class TestTransformDataTypes:
                                                     '{"type":"Point","coordinates":[-87.6200,41.8600]}'], dtype='string')
         })
 
+    @pytest.mark.unit
     def test_correct_data_types_assignment(self, sample_raw_data):
         """
         REFACTORIZADO (Test 1): Verificar que todos los tipos de datos se asignen
@@ -147,7 +152,7 @@ class TestTransformDataTypes:
             'shared_trip_authorized': 'boolean'
         }
         
-        df_transformed = transform_data_types(sample_raw_data.copy())
+        df_transformed = transform_dataframe_types(sample_raw_data.copy())
         
         for col_name, expected_type in expected_schema.items():
             if expected_type == 'datetime64[ns]':
@@ -162,7 +167,7 @@ class TestTransformDataTypes:
         Test 2: Verificar que no se pierdan registros durante la transformación
         """
         original_count = len(sample_raw_data)
-        df_transformed = transform_data_types(sample_raw_data.copy())
+        df_transformed = transform_dataframe_types(sample_raw_data.copy())
         transformed_count = len(df_transformed)
         
         assert original_count == transformed_count, \
@@ -173,7 +178,7 @@ class TestTransformDataTypes:
         Test 3: Verificar que todas las columnas se mantengan después de la transformación
         """
         original_columns = set(sample_raw_data.columns)
-        df_transformed = transform_data_types(sample_raw_data.copy())
+        df_transformed = transform_dataframe_types(sample_raw_data.copy())
         transformed_columns = set(df_transformed.columns)
         
         assert original_columns == transformed_columns, \
@@ -185,7 +190,7 @@ class TestTransformDataTypes:
         Verificar que la transformación sea EXACTA usando assert_frame_equal.
         Esto valida valores, dtypes, columnas e índice, todo en uno.
         """
-        df_transformed = transform_data_types(sample_raw_data.copy())
+        df_transformed = transform_dataframe_types(sample_raw_data.copy())
         
         # Compara todo. Es estricto y la mejor forma de validar un DF.
         pd.testing.assert_frame_equal(df_transformed, expected_transformed_data)
@@ -194,7 +199,7 @@ class TestTransformDataTypes:
         """
         Test 7: Verificar que los valores nulos se manejen correctamente con tipos nullable
         """
-        df_transformed = transform_data_types(sample_data_with_nulls.copy())
+        df_transformed = transform_dataframe_types(sample_data_with_nulls.copy())
         
         # Verificar que nullable integers acepten NA
         assert pd.isna(df_transformed['trip_seconds'].iloc[1])
@@ -216,7 +221,7 @@ class TestTransformDataTypes:
         Verificar que los datos malformados se coercionen a NA/NaT
         (asumiendo que la función usa errors='coerce')
         """
-        df_transformed = transform_data_types(sample_malformed_data.copy())
+        df_transformed = transform_dataframe_types(sample_malformed_data.copy())
 
         # Verificar que los valores malformados se convirtieron en Nulos
         assert pd.isna(df_transformed['trip_start_timestamp'].iloc[0]), "Fecha malformada debe ser NaT"
@@ -280,8 +285,8 @@ class TestExtractTripsData:
         def mock_get_dir():
             return temp_output_dir
         
-        monkeypatch.setattr('chicago_rstrips.extract_raw_trips_data.fetch_data_from_api', mock_fetch)
-        monkeypatch.setattr('chicago_rstrips.extract_raw_trips_data.get_raw_data_dir', mock_get_dir)
+        monkeypatch.setattr('chicago_rstrips.extract_trips_data.fetch_data_from_api', mock_fetch)
+        monkeypatch.setattr('chicago_rstrips.extract_trips_data.get_raw_data_dir', mock_get_dir)
         
         # Ejecutar extracción
         output_path = extract_trips_data("test_output.parquet")

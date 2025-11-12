@@ -1,18 +1,6 @@
 -- Archivo: sql/create_stg_raw_trips.sql
 -- Descripción: Schema de la tabla de staging para viajes crudos
 
-
--- ============================================================
--- 1. CREAR SCHEMA
--- ============================================================
-CREATE SCHEMA IF NOT EXISTS staging;
-
--- ============================================================
--- ELIMINAR TABLAS EXISTENTES (en orden correcto por FKs)
--- ============================================================
-DROP TABLE IF EXISTS staging.stg_raw_trips CASCADE;
-DROP TABLE IF EXISTS staging.stg_raw_traffic CASCADE;
-
 -- ============================================================
 -- TABLA: Staging de Viajes
 -- ============================================================
@@ -51,7 +39,7 @@ COMMENT ON COLUMN staging.stg_raw_trips.dropoff_location_id IS 'FK a dim.dim_cen
 
 
 -- ============================================================
--- TABLA: Staging de Tráfico
+-- TABLA: Staging de Tráficc
 -- ============================================================
 CREATE TABLE IF NOT EXISTS staging.stg_raw_traffic (
     record_id VARCHAR(50) PRIMARY KEY,
@@ -69,3 +57,7 @@ CREATE TABLE IF NOT EXISTS staging.stg_raw_traffic (
 -- Índices para mejorar consultas
 CREATE INDEX IF NOT EXISTS stg_raw_traffic_time ON staging.stg_raw_traffic(time);
 CREATE INDEX IF NOT EXISTS stg_raw_traffic_region_id ON staging.stg_raw_traffic(region_id);
+
+-- ============================================================
+-- TABLA: Staging de weather
+-- ============================================================

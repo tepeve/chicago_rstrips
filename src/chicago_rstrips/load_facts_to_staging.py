@@ -4,7 +4,7 @@ from pathlib import Path
 from chicago_rstrips.db_loader import get_engine,run_ddl,load_dataframe_to_postgres
 
 
-def load_trip_data_to_postgres(parquet_path, table_name="stg_raw_trips", ddl_path="create_staging_schema.sql"):
+def load_trip_data_to_postgres(parquet_path, table_name="stg_raw_trips", ddl_path="create_staging_tables.sql"):
     """
     Carga un archivo parquet a una tabla en PostgreSQL, ejecutando DDL si se provee.
     """
@@ -62,7 +62,7 @@ def load_trip_data_to_postgres(parquet_path, table_name="stg_raw_trips", ddl_pat
 
 
 
-def load_traffic_data_to_postgres(parquet_path, table_name="stg_raw_traffic", ddl_path="create_staging_schema.sql"):
+def load_traffic_data_to_postgres(parquet_path, table_name="stg_raw_traffic", ddl_path="create_staging_tables.sql"):
     """
     Carga un archivo parquet a una tabla en PostgreSQL, ejecutando DDL si se provee.
     """

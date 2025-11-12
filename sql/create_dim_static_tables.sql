@@ -1,71 +1,16 @@
--- Archivo: sql/create_dim_location_schema.sql
--- Descripción: Schema y tablas para features geoespaciales
-
--- ============================================================
--- 1. CREAR SCHEMA
--- ============================================================
-CREATE SCHEMA IF NOT EXISTS dim_spatial;
 
 
 -- ============================================================
--- 2. ELIMINAR TABLAS EXISTENTES (en orden correcto por FKs)
+-- 2. ELIMINA TABLAS EXISTENTES (en orden correcto por FKs)
 -- ============================================================
-DROP TABLE IF EXISTS dim_spatial.trips_locations CASCADE;
-DROP TABLE IF EXISTS dim_spatial.weather_voronoi_zones CASCADE;
-DROP TABLE IF EXISTS dim_spatial.weather_stations_points CASCADE;
 DROP TABLE IF EXISTS dim_spatial.chicago_city_boundary CASCADE;
-
-
-
--- ============================================================
--- TABLA: Dimensión de Ubicaciones de Viajes
--- ============================================================
-CREATE TABLE IF NOT EXISTS dim_spatial.trips_locations (
-    location_id VARCHAR(20) PRIMARY KEY,
-    original_text TEXT NOT NULL,
-    longitude DOUBLE PRECISION,
-    latitude DOUBLE PRECISION,
-    source_type VARCHAR(30) DEFAULT 'census_centroid',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Índice espacial si decides usar PostGIS más adelante
-CREATE INDEX IF NOT EXISTS idx_dimlocation_location_coords ON dim_spatial.trips_locations(longitude, latitude);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_dimlocation_location_text ON dim_spatial.trips_locations(original_text);
-
-COMMENT ON TABLE dim_spatial.trips_locations IS 'Dimensión de ubicaciones basada en centroides de census tracts';
-COMMENT ON COLUMN dim_spatial.trips_locations.location_id IS 'Hash SHA1 truncado del texto original del centroide';
-COMMENT ON COLUMN dim_spatial.trips_locations.original_text IS 'Texto original del centroide desde la API (POINT, JSON, etc)';
-COMMENT ON COLUMN dim_spatial.trips_locations.longitude IS 'Longitud parseada (NULL si no se pudo extraer)';
-COMMENT ON COLUMN dim_spatial.trips_locations.latitude IS 'Latitud parseada (NULL si no se pudo extraer)';
-
--- ============================================================
--- TABLA: Dimensión de regiones de trafico
--- ============================================================
-CREATE TABLE IF NOT EXISTS dim_spatial.traffic_regions (
-    region_id INTEGER PRIMARY KEY,
-    region TEXT NOT NULL,
-    description TEXT NOT NULL,
-    west DOUBLE PRECISION,
-    east DOUBLE PRECISION,
-    south DOUBLE PRECISION,
-    north DOUBLE PRECISION,
-    geometry_wkt TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-
-
-COMMENT ON TABLE dim_spatial.traffic_regions IS 'Dimensión de regiones de tránsitoo basadas en áreas definidas por la ciudad';
-COMMENT ON COLUMN dim_spatial.traffic_regions.region_id IS 'Número identificador de la región de tráfico - ya servido por el proveedor de datos';
-COMMENT ON COLUMN dim_spatial.traffic_regions.geometry_wkt IS 'Geometría en formato Well-Known Text (WKT) representando el polígono de la región';
+DROP TABLE IF EXISTS dim_spatial.weather_stations_points CASCADE;
+DROP TABLE IF EXISTS dim_spatial.weather_voronoi_zones CASCADE;
 
 -- ============================================================
 -- TABLA: Estaciones Meteorológicas
 -- ============================================================
-CREATE TABLE dim_spatial.weather_stations_points (
+CREATE TABLE IF NOT EXISTS dim_spatial.weather_stations_points (
     station_id VARCHAR(50) PRIMARY KEY,
     station_name VARCHAR(100),
     longitude NUMERIC(10, 7) NOT NULL,  -- Precisión de ~1cm
@@ -96,7 +41,7 @@ COMMENT ON COLUMN dim_spatial.weather_stations_points.geometry_wkt IS
 -- ============================================================
 -- TABLA: Zonas de Voronoi
 -- ============================================================
-CREATE TABLE dim_spatial.weather_voronoi_zones (
+CREATE TABLE IF NOT EXISTS dim_spatial.weather_voronoi_zones (
     zone_id SERIAL PRIMARY KEY,
     station_id VARCHAR(50) NOT NULL,
     geometry_wkt TEXT NOT NULL,
@@ -132,7 +77,7 @@ COMMENT ON COLUMN dim_spatial.weather_voronoi_zones.area_km2 IS
 -- ============================================================
 -- TABLA: Perímetro de Chicago
 -- ============================================================
-CREATE TABLE dim_spatial.chicago_city_boundary (
+CREATE TABLE IF NOT EXISTS  dim_spatial.chicago_city_boundary (
     boundary_id SERIAL PRIMARY KEY,
     city_name VARCHAR(100) DEFAULT 'Chicago',
     geometry_wkt TEXT NOT NULL,
@@ -173,7 +118,6 @@ LEFT JOIN dim_spatial.weather_voronoi_zones vz ON ws.station_id = vz.station_id;
 
 COMMENT ON VIEW dim_spatial.vw_stations_with_zones IS 
 'Vista que combina estaciones meteorológicas con sus zonas de Voronoi';
-
 
 
 
