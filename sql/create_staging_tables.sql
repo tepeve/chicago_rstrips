@@ -47,7 +47,6 @@ CREATE TABLE IF NOT EXISTS staging.stg_raw_traffic (
     speed DOUBLE PRECISION,
     region_id INTEGER,
     region VARCHAR(100),
-    description TEXT,
     bus_count INTEGER,
     num_reads INTEGER,
     -- Auditoría
@@ -61,3 +60,18 @@ CREATE INDEX IF NOT EXISTS stg_raw_traffic_region_id ON staging.stg_raw_traffic(
 -- ============================================================
 -- TABLA: Staging de weather
 -- ============================================================
+
+CREATE TABLE IF NOT EXISTS staging.stg_raw_weather (
+    record_id VARCHAR(20) PRIMARY KEY,
+    datetime TIMESTAMP,
+    station_id TIMESTAMP,
+    temp DOUBLE PRECISION,
+    feelslike DOUBLE PRECISION,
+    precipprob DOUBLE PRECISION,
+    windspeed VARCHAR(10),
+    winddir DOUBLE PRECISION,
+    conditions TEXT,
+    -- Auditoría
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+

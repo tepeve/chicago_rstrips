@@ -14,7 +14,7 @@ api_endpoint = CHIC_TRAFFIC_API_URL
 # Definir la query SoQL
 soql_query = f"""
 SELECT
-  time, region_id, speed, region, bus_count, num_reads, hour, description, record_id, 
+  time, region_id, speed, region, bus_count, num_reads, hour, record_id, 
   west, east, north, south 
 WHERE
   time BETWEEN '{START_DATE}' AND '{END_DATE}'
@@ -35,17 +35,11 @@ type_mapping = {
     
     # Strings
     'region': 'string',
-    'description': 'string',
     'record_id': 'string',
     
     # Numéricos decimales
-    'speed': 'float64',
+    'speed': 'float64'
         
-    # Geolocation (mantener como string o parsear JSON)
-    'west': 'string',
-    'east': 'string',
-    'north': 'string',
-    'south': 'string',
 }
 
 
@@ -56,7 +50,7 @@ def build_location_dimension(df):
     Devuelve un GeoDataFrame con columnas: region_id, region, description, geometry.
     """
     # Seleccionar columnas relevantes y eliminar duplicados
-    regions = df[['region_id', 'region', 'description', 'west', 'east', 'south', 'north']].drop_duplicates()
+    regions = df[['region_id', 'region', 'west', 'east', 'south', 'north']].drop_duplicates()
 
     # Crear polígonos a partir de las coordenadas
     def make_poly(row):
@@ -114,7 +108,7 @@ def map_location_keys(df, mapping):
     Asigna una clave de región a cada fila del DataFrame usando el mapping.
     """
     df = df.copy()
-    df['region_key'] = df['region_id'].map(mapping)
+    df['region_id'] = df['region_id'].map(mapping)
     return df
 
 
@@ -143,17 +137,7 @@ def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
         df = transform_dataframe_types(df,type_mapping)
         print("Tipos de datos después de transformación:")
         print(df.dtypes)
-
-        print("\n--- Aplicando filtro para dejar solamente las columnas que definimos en type_mapping ---")
-        print(f"Columnas antes del filtro: {list(df.columns)}")
-        api_columns_to_keep = list(type_mapping.keys())
-        df = df[api_columns_to_keep]
-        print(f"Columnas después del filtro: {list(df.columns)}")
-
-        print("\n--- Vista previa del DataFrame ---")
-        print(df.head())
-
-       
+      
         # Construir path usando utils
         raw_dir = get_raw_data_dir()
         traffic_data_path = raw_dir / output_filename
@@ -165,7 +149,17 @@ def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
             else:
                 existing_dim = pd.read_parquet(traffic_regions_path) if traffic_regions_path.exists() else None
                 dim_df, mapping = update_location_dimension(existing_dim, df)
-            trips_df = map_location_keys(df, mapping)
+            traffic_df = map_location_keys(df, mapping)
+
+        print("\n--- Aplicando filtro para dejar solamente las columnas que definimos en type_mapping ---")
+        print(f"Columnas antes del filtro: {list(df.columns)}")
+        api_columns_to_keep = list(type_mapping.keys())
+        traffic_df = traffic_df[api_columns_to_keep]
+        print(f"Columnas después del filtro: {list(traffic_df.columns)}")
+        print("\n--- Vista previa del DataFrame ---")
+        print(traffic_df.head())
+
+        if build_regions:
             # Convertir a WGS84
             if dim_df.crs.to_epsg() != 4326:
                 dim_df = dim_df.to_crs(epsg=4326)
@@ -176,7 +170,6 @@ def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
             dim_df = pd.DataFrame({
                 'region_id': dim_df['region_id'],
                 'region': dim_df['region'],
-                'description': dim_df['description'],
                 'west': dim_df['west'],
                 'east': dim_df['east'],
                 'south': dim_df['south'],
@@ -186,14 +179,14 @@ def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
                 'crs': 'EPSG:4326'
             })
 
-            trips_df.to_parquet(traffic_data_path, index=False)
+            traffic_df.to_parquet(traffic_data_path, index=False)
             dim_df.to_parquet(traffic_regions_path, index=False)
             print(f"Parquet traffic data (sin geometrías): {traffic_data_path}")
             print(f"Parquet traffic regions: {traffic_regions_path}")
         else:
-            # Guardar dataset crudo con geometrías intactas
-            df.to_parquet(traffic_data_path, index=False)
-            print(f"Parquet traffic data (crudo con geometrías): {traffic_data_path}")
+            # Guardar dataset crudo sin geometrías
+            traffic_df.to_parquet(traffic_data_path, index=False)
+            print(f"Parquet traffic data: {traffic_data_path}")
         return str(traffic_data_path)
         
     else:

@@ -28,6 +28,11 @@ SOCRATA_APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN")
 if not SOCRATA_APP_TOKEN:
     raise ValueError("La variable de entorno SOCRATA_APP_TOKEN no está configurada.")
 
+# WEATHER API KEY
+# https://www.visualcrossing.com/resources/documentation/
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+if not WEATHER_API_KEY:
+    raise ValueError("La variable de entorno WEATHER_API_KEY no está configurada.")
 
 # REDSHIFT CREDENTIALS
 REDSHIFT_HOST = os.getenv("REDSHIFT_HOST")

@@ -1,5 +1,6 @@
 from airflow.decorators import dag, task
 from pendulum import datetime
+from chicago_rstrips.extract_weather_data import extract_weather_data
 from chicago_rstrips.utils import get_outputs_dir, get_raw_data_dir
 
 # --- 1. Imports Limpios ---
@@ -86,6 +87,20 @@ def etl_pipeline():
             'traffic_path': traffic_path_str,
             'regions_path': str(raw_dir / "traffic_regions.parquet")
         }
+    
+    @task
+    def extract_weather() -> dict:
+        print("Extrayendo datos de clima desde Visual Crossing Weather API...")
+        
+        weather_path_str = extract_weather_data(
+            output_filename="stg_raw_weather.parquet",
+        )
+        
+        if not weather_path_str:
+            raise ValueError("No se pudo extraer datos de clima")
+        return {
+            'weather_path': weather_path_str
+        }
 
     # --- Tareas de Carga ---
 
@@ -128,13 +143,23 @@ def etl_pipeline():
             schema="dim_spatial",
             if_exists="replace"
         )
+
+    @task
+    def load_weather(paths: dict):
+        print("Cargando datos de clima a PostgreSQL...")
+        load_parquet_to_postgres(
+            parquet_path=paths['weather_path'],
+            table_name="stg_raw_weather",
+            schema="staging",
+            if_exists="replace"
+        )
     
-    # --- 5. Tareas de Verificación y Reporte (con bug corregido) ---
+    # --- Tareas de Verificación y Reporte (con bug corregido) ---
     
     @task
-    def combine_paths(trips_paths: dict, traffic_paths: dict) -> dict:
-        """Combina los diccionarios de paths de trips y traffic."""
-        return {**trips_paths, **traffic_paths}
+    def combine_paths(trips_paths: dict, traffic_paths: dict, weather_paths: dict) -> dict:
+        """Combina los diccionarios de paths de trips, traffic y weather."""
+        return {**trips_paths, **traffic_paths, **weather_paths}
 
     @task
     def verify_load(paths: dict):
@@ -177,34 +202,39 @@ def etl_pipeline():
     # FLUJO DEL DAG
     # ====================================================================
     
-    # 1. Crear todas las tablas PRIMERO
+    # Crear todas las tablas PRIMERO
     ddl_task = setup_ddl()
 
-    # 2. Rama de Trips
+    # Rama de Trips
     trips_paths = extract_trips()
     trips_loaded = load_trips(trips_paths)
     locations_loaded = load_locations(trips_paths)
 
-    # 3. Rama de Traffic
+    # Rama de Traffic
     traffic_paths = extract_traffic()
     traffic_loaded = load_traffic(traffic_paths)
     regions_loaded = load_traffic_regions(traffic_paths)
     
-    # 4. Dependencias de DDL: NADA se carga antes que las tablas existan
-    ddl_task >> [trips_loaded, locations_loaded, traffic_loaded, regions_loaded]
+    # Rama de Weather
+    weather_paths = extract_weather()
+    weather_loaded = load_weather(weather_paths)
+
+    # Dependencias de DDL: NADA se carga antes que las tablas existan
+    ddl_task >> [trips_loaded, locations_loaded, traffic_loaded, regions_loaded, weather_loaded]
     
-    # 5. Dependencias de Extracción
+    # Dependencias de Extracción
     trips_paths >> [trips_loaded, locations_loaded]
     traffic_paths >> [traffic_loaded, regions_loaded]
+    weather_paths >> weather_loaded
 
-    # 6. Verificar después de que TODAS las cargas terminen
-    all_loads_done = [trips_loaded, locations_loaded, traffic_loaded, regions_loaded]
-    all_paths = combine_paths(trips_paths, traffic_paths)
+    # Verificar después de que TODAS las cargas terminen
+    all_loads_done = [trips_loaded, locations_loaded, traffic_loaded, regions_loaded, weather_loaded]
+    all_paths = combine_paths(trips_paths, traffic_paths, weather_paths)
     
     verification = verify_load(all_paths)
     verification.set_upstream(all_loads_done) # <-- Dependencia explícita
 
-    # 7. Generar reporte
+    # Generar reporte
     generate_report(verification)
 
 etl_pipeline()
