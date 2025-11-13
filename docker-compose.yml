@@ -18,12 +18,12 @@ x-airflow-common:
   volumes:
     # Monta tus carpetas locales en el contenedor.
     - ./dags:/opt/airflow/dags
-    - ./src:/opt/airflow/src # Monta código fuente
-    - ./data:/opt/airflow/data # Monta carpeta de datos
-    - ./.env:/opt/airflow/.env # Pasa variables de entorno      
-    - ./sql:/opt/airflow/sql   # <-- Monta carpeta sql
-    - ./tests:/opt/airflow/tests # <-- Monta carpeta tests
-    - ./outputs:/opt/airflow/outputs # <-- Monta carpeta outputs
+    - ./src:/opt/airflow/src 
+    - ./data:/opt/airflow/data 
+    - ./.env:/opt/airflow/.env      
+    - ./sql:/opt/airflow/sql  
+    - ./tests:/opt/airflow/tests 
+    - ./outputs:/opt/airflow/outputs 
 
   depends_on:
     - postgres_airflow_db

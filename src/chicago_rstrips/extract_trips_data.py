@@ -28,7 +28,7 @@ SELECT
   pickup_community_area, dropoff_community_area, fare, tip, 
   additional_charges, trip_total
 WHERE
-  trip_start_timestamp BETWEEN '{START_DATE}' AND '{END_DATE}'
+  trip_start_timestamp BETWEEN '{start_timestamp}' AND '{end_timestamp}'
   AND trip_id LIKE '%a0'
   AND percent_time_chicago = 1
   LIMIT 100
@@ -168,7 +168,9 @@ def update_location_dimension(existing_dim: pd.DataFrame,
 def extract_trips_data(output_filename="raw_trips_data.parquet",
                        build_locations: bool = False,
                        locations_strategy: str = "incremental",  # 'incremental' | 'rebuild'
-                       locations_filename: str = "centroid_locations.parquet"):
+                       locations_filename: str = "centroid_locations.parquet",
+                       start_timestamp: str = None,
+                       end_timestamp: str = None):
     """
     Extrae datos de trips y los guarda en formato parquet.
     
@@ -179,7 +181,7 @@ def extract_trips_data(output_filename="raw_trips_data.parquet",
         Path: Ruta del archivo guardado o None si no hay datos
     """
     # Llamar a la función para obtener los datos
-    df = fetch_data_from_api(soql_query,api_endpoint)
+    df = fetch_data_from_api(soql_query,api_endpoint, start_timestamp, end_timestamp)
     
     # Convertir a parquet y almacenar en una base de datos si hay datos
     if df is not None:
