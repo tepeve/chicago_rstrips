@@ -31,6 +31,7 @@ jobs:
       - name: 🧪 Ejecutar tests
         run: |
           export PYTHONPATH=$PWD/src
+          export WEATHER_API_KEY=dummy
           export SOCRATA_APP_TOKEN=dummy
           export POSTGRES_LOCAL_HOST=localhost
           export POSTGRES_LOCAL_PORT=5432
