@@ -31,6 +31,11 @@ jobs:
       - name: 🧪 Ejecutar tests
         run: |
           export SOCRATA_APP_TOKEN=dummy
+          export POSTGRES_LOCAL_HOST=localhost
+          export POSTGRES_LOCAL_PORT=5432
+          export POSTGRES_LOCAL_USER=dummy
+          export POSTGRES_LOCAL_PASSWORD=dummy
+          export POSTGRES_LOCAL_DB=dummy
           uv run pytest -m "unit and ci" --cov=src/chicago_rstrips --cov-report=xml --cov-report=term-missing
 
           
