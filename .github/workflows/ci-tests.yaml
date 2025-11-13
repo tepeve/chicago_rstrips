@@ -29,9 +29,8 @@ jobs:
           uv sync
           
       - name: 🧪 Ejecutar tests
-        run: |
-          cd tests
-          uv run pytest tests
+        run: uv run pytest -m "unit and ci" --cov=src/chicago_rstrips --cov-report=xml --cov-report=term-missing
+
           
   lint:
     name: Linting y Formateo
