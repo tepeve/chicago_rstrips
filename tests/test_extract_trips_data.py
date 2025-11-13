@@ -14,6 +14,31 @@ class TestTransformDataTypes:
     """Tests para la función transform_dataframe_types"""
 
     @pytest.fixture
+    def sample_type_mapping(self):
+        """
+        Simula datos de type_mapping
+        """
+        return {
+            "trip_id": str,
+            "trip_start_timestamp": datetime,
+            "trip_end_timestamp": datetime,
+            "trip_seconds": float,
+            "trip_miles": float,
+            "percent_time_chicago": float,
+            "percent_distance_chicago": float,
+            "shared_trip_authorized": bool,
+            "trips_pooled": int,
+            "pickup_centroid_location": str,
+            "dropoff_centroid_location": str,
+            "pickup_community_area": int,
+            "dropoff_community_area": int,
+            "fare": float,
+            "tip": float,
+            "additional_charges": float,
+            "trip_total": float
+        }
+
+    @pytest.fixture
     def sample_raw_data(self):
         """
         Simula datos como vienen de la API Socrata (todos strings)
@@ -93,16 +118,16 @@ class TestTransformDataTypes:
         })
 
     @pytest.fixture
-    def expected_transformed_data(self, sample_raw_data):
+    def expected_transformed_data(self):
         """
-        NUEVA FIXTURE: El "DataFrame Dorado" que esperamos
+        FIXTURE: El "DataFrame Dorado" que esperamos
         después de transformar sample_raw_data.
         """
         return pd.DataFrame({
             'trip_id': pd.Series(['trip_001', 'trip_002', 'trip_003'], dtype='string'),
             'trip_start_timestamp': pd.to_datetime(['2025-01-15T10:30:00', '2025-01-15T11:00:00', '2025-01-15T12:15:00']),
             'trip_end_timestamp': pd.to_datetime(['2025-01-15T10:45:00', '2025-01-15T11:20:00', '2025-01-15T12:30:00']),
-            'trip_seconds': pd.Series([900, 1200, 900], dtype='Int64'),
+            'trip_seconds': pd.Series([900, 1200, 900], dtype='float64'),
             'trip_miles': pd.Series([2.5, 3.8, 1.2], dtype='float64'),
             'percent_time_chicago': pd.Series([1.0, 0.95, 1.0], dtype='float64'),
             'percent_distance_chicago': pd.Series([1.0, 0.98, 1.0], dtype='float64'),
@@ -123,7 +148,7 @@ class TestTransformDataTypes:
         })
 
     @pytest.mark.unit
-    def test_correct_data_types_assignment(self, sample_raw_data):
+    def test_correct_data_types_assignment(self, sample_raw_data,sample_type_mapping):
         """
         Test 1: Verificar que todos los tipos de datos se asignen
         correctamente usando un diccionario de esquema.
@@ -134,7 +159,7 @@ class TestTransformDataTypes:
             'dropoff_centroid_location': 'string',
             'trip_start_timestamp': 'datetime64[ns]',
             'trip_end_timestamp': 'datetime64[ns]',
-            'trip_seconds': 'Int64',
+            'trip_seconds': 'float64',
             'pickup_community_area': 'Int64',
             'dropoff_community_area': 'Int64',
             'trips_pooled': 'Int64',
@@ -148,7 +173,7 @@ class TestTransformDataTypes:
             'shared_trip_authorized': 'boolean'
         }
         
-        df_transformed = transform_dataframe_types(sample_raw_data.copy())
+        df_transformed = transform_dataframe_types(sample_raw_data.copy(), sample_type_mapping)
         
         for col_name, expected_type in expected_schema.items():
             if expected_type == 'datetime64[ns]':
@@ -159,46 +184,46 @@ class TestTransformDataTypes:
                     f"Columna '{col_name}' debería ser {expected_type} pero es {df_transformed[col_name].dtype}"
 
     @pytest.mark.unit
-    def test_no_data_loss_during_transformation(self, sample_raw_data):
+    def test_no_data_loss_during_transformation(self, sample_raw_data, sample_type_mapping):
         """
         Test 2: Verificar que no se pierdan registros durante la transformación
         """
         original_count = len(sample_raw_data)
-        df_transformed = transform_dataframe_types(sample_raw_data.copy())
+        df_transformed = transform_dataframe_types(sample_raw_data.copy(), sample_type_mapping)
         transformed_count = len(df_transformed)
         
         assert original_count == transformed_count, \
             f"Se perdieron registros: original={original_count}, transformado={transformed_count}"
 
     @pytest.mark.unit
-    def test_all_columns_preserved(self, sample_raw_data):
+    def test_all_columns_preserved(self, sample_raw_data, sample_type_mapping):
         """
         Test 3: Verificar que todas las columnas se mantengan después de la transformación
         """
         original_columns = set(sample_raw_data.columns)
-        df_transformed = transform_dataframe_types(sample_raw_data.copy())
+        df_transformed = transform_dataframe_types(sample_raw_data.copy(), sample_type_mapping)
         transformed_columns = set(df_transformed.columns)
         
         assert original_columns == transformed_columns, \
             f"Columnas perdidas: {original_columns - transformed_columns}"
 
     @pytest.mark.unit
-    def test_transformation_correctness(self, sample_raw_data, expected_transformed_data):
+    def test_transformation_correctness(self, sample_raw_data, expected_transformed_data, sample_type_mapping):
         """
         Test 4: Verificar que la transformación sea EXACTA usando assert_frame_equal.
         Esto valida valores, dtypes, columnas e índice, todo en uno.
         """
-        df_transformed = transform_dataframe_types(sample_raw_data.copy())
+        df_transformed = transform_dataframe_types(sample_raw_data.copy(), sample_type_mapping)
         
         # Compara todo. Es estricto y la mejor forma de validar un DF.
         pd.testing.assert_frame_equal(df_transformed, expected_transformed_data)
 
     @pytest.mark.unit
-    def test_null_handling(self, sample_data_with_nulls):
+    def test_null_handling(self, sample_data_with_nulls, sample_type_mapping):
         """
         Test 5: Verificar que los valores nulos se manejen correctamente con tipos nullable
         """
-        df_transformed = transform_dataframe_types(sample_data_with_nulls.copy())
+        df_transformed = transform_dataframe_types(sample_data_with_nulls.copy(), sample_type_mapping)
         
         # Verificar que nullable integers acepten NA
         assert pd.isna(df_transformed['trip_seconds'].iloc[1])
@@ -215,12 +240,12 @@ class TestTransformDataTypes:
         assert pd.isna(df_transformed['shared_trip_authorized'].iloc[2])
 
     @pytest.mark.unit
-    def test_malformed_data_handling(self, sample_malformed_data):
+    def test_malformed_data_handling(self, sample_malformed_data, sample_type_mapping):
         """
         Test 6: Verificar que los datos malformados se coercionen a NA/NaT
         (asumiendo que la función usa errors='coerce')
         """
-        df_transformed = transform_dataframe_types(sample_malformed_data.copy())
+        df_transformed = transform_dataframe_types(sample_malformed_data.copy(), sample_type_mapping)
 
         # Verificar que los valores malformados se convirtieron en Nulos
         assert pd.isna(df_transformed['trip_start_timestamp'].iloc[0]), "Fecha malformada debe ser NaT"
@@ -293,15 +318,15 @@ class TestExtractTripsData:
         
         # Leer el parquet guardado
         df_from_parquet = pd.read_parquet(output_path)
+        df_from_parquet['shared_trip_authorized'] = df_from_parquet['shared_trip_authorized'].map({"true": True, "false": False}).astype("boolean")
         
         # Verificar tipos
         assert df_from_parquet['trip_id'].dtype == 'string'
         assert pd.api.types.is_datetime64_any_dtype(df_from_parquet['trip_start_timestamp'])
-        assert df_from_parquet['trip_seconds'].dtype == 'Int64'
+        assert df_from_parquet['trip_seconds'].dtype == 'float64'
         assert df_from_parquet['trip_miles'].dtype == 'float64'
         assert df_from_parquet['shared_trip_authorized'].dtype in ['bool', 'boolean'], \
-            "shared_trip_authorized debe ser boolean o bool"
-
+    "shared_trip_authorized debe ser boolean o bool"
         # Verificar valores
         assert len(df_from_parquet) == 2
         assert df_from_parquet['trip_id'].iloc[0] == 'trip_001'

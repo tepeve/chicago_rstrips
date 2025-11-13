@@ -44,12 +44,12 @@ type_mapping = {
     'trip_end_timestamp': 'datetime64[ns]',
     
     # Numéricos enteros
-    'trip_seconds': 'Int64',  # Nullable integer
     'pickup_community_area': 'Int64',
     'dropoff_community_area': 'Int64',
     'trips_pooled': 'Int64',
     
     # Numéricos decimales
+    'trip_seconds': 'float64',  # Nullable integer
     'trip_miles': 'float64',
     'percent_time_chicago': 'float64',
     'percent_distance_chicago': 'float64',

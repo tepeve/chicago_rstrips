@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS staging.stg_raw_trips (
     trip_id VARCHAR(50) PRIMARY KEY,
     trip_start_timestamp TIMESTAMP,
     trip_end_timestamp TIMESTAMP,
-    trip_seconds INTEGER,
+    trip_seconds DOUBLE PRECISION,
     trip_miles DOUBLE PRECISION,
     percent_time_chicago DOUBLE PRECISION,
     percent_distance_chicago DOUBLE PRECISION,

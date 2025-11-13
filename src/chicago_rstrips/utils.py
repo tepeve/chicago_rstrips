@@ -62,27 +62,28 @@ def transform_dataframe_types(df, type_mapping):
         pd.DataFrame: DataFrame con tipos corregidos
     """
     for col, dtype in type_mapping.items():
-        if col in df.columns:
-            try:
-                if dtype.startswith('datetime'):
-                    df[col] = pd.to_datetime(df[col], errors='coerce')
-                
-                elif dtype == 'boolean':
-                    map_dict = {'true': True, 'false': False, True: True, False: False}
-                    df[col] = df[col].map(map_dict).astype('boolean')
-                
-                elif dtype == 'Int64':
-                    df[col] = pd.to_numeric(df[col], errors='coerce').astype('Int64')
-
-                elif dtype == 'float64':
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-                
-                elif dtype == 'string':
-                    df[col] = df[col].astype('string')
-                
-            except Exception as e:
-                print(f"Advertencia: No se pudo convertir columna '{col}' a {dtype}: {e}")
-    
+        if col not in df.columns:
+            continue
+        try:
+            # Fechas
+            if "timestamp" in col or "date" in col:
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+            # Booleanos
+            elif dtype == bool:
+                df[col] = df[col].map({"true": True, "false": False}).astype("boolean")
+            # Strings
+            elif dtype == str:
+                df[col] = df[col].astype("string")
+            # Flotantes
+            elif dtype == float:
+                df[col] = pd.to_numeric(df[col], errors="coerce").astype("float64")
+            # Enteros
+            elif dtype == int:
+                df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
+            else:
+                df[col] = df[col].astype(dtype)
+        except Exception as e:
+            print(f"Advertencia: No se pudo convertir columna '{col}' a {dtype}: {e}")
     return df
 
 # ============================================================
