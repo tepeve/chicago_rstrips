@@ -14,7 +14,6 @@ class TestTransformDataTypes:
     """Tests para la función transform_dataframe_types"""
 
     @pytest.fixture
-    @pytest.mark.unit
     def sample_raw_data(self):
         """
         Simula datos como vienen de la API Socrata (todos strings)
@@ -44,7 +43,6 @@ class TestTransformDataTypes:
         })
 
     @pytest.fixture
-    @pytest.mark.unit
     def sample_data_with_nulls(self):
         """
         Simula datos con valores nulos/vacíos para probar el manejo de nullables
@@ -70,7 +68,6 @@ class TestTransformDataTypes:
         })
 
     @pytest.fixture
-    @pytest.mark.unit
     def sample_malformed_data(self):
         """
         NUEVA FIXTURE: Simula datos con valores malformados (camino triste)
@@ -96,7 +93,6 @@ class TestTransformDataTypes:
         })
 
     @pytest.fixture
-    @pytest.mark.unit
     def expected_transformed_data(self, sample_raw_data):
         """
         NUEVA FIXTURE: El "DataFrame Dorado" que esperamos
@@ -129,7 +125,7 @@ class TestTransformDataTypes:
     @pytest.mark.unit
     def test_correct_data_types_assignment(self, sample_raw_data):
         """
-        REFACTORIZADO (Test 1): Verificar que todos los tipos de datos se asignen
+        Test 1: Verificar que todos los tipos de datos se asignen
         correctamente usando un diccionario de esquema.
         """
         expected_schema = {
@@ -162,6 +158,7 @@ class TestTransformDataTypes:
                 assert df_transformed[col_name].dtype == expected_type, \
                     f"Columna '{col_name}' debería ser {expected_type} pero es {df_transformed[col_name].dtype}"
 
+    @pytest.mark.unit
     def test_no_data_loss_during_transformation(self, sample_raw_data):
         """
         Test 2: Verificar que no se pierdan registros durante la transformación
@@ -173,6 +170,7 @@ class TestTransformDataTypes:
         assert original_count == transformed_count, \
             f"Se perdieron registros: original={original_count}, transformado={transformed_count}"
 
+    @pytest.mark.unit
     def test_all_columns_preserved(self, sample_raw_data):
         """
         Test 3: Verificar que todas las columnas se mantengan después de la transformación
@@ -184,10 +182,10 @@ class TestTransformDataTypes:
         assert original_columns == transformed_columns, \
             f"Columnas perdidas: {original_columns - transformed_columns}"
 
+    @pytest.mark.unit
     def test_transformation_correctness(self, sample_raw_data, expected_transformed_data):
         """
-        NUEVO TEST (reemplaza 4, 5, 6, 8, 9): 
-        Verificar que la transformación sea EXACTA usando assert_frame_equal.
+        Test 4: Verificar que la transformación sea EXACTA usando assert_frame_equal.
         Esto valida valores, dtypes, columnas e índice, todo en uno.
         """
         df_transformed = transform_dataframe_types(sample_raw_data.copy())
@@ -195,9 +193,10 @@ class TestTransformDataTypes:
         # Compara todo. Es estricto y la mejor forma de validar un DF.
         pd.testing.assert_frame_equal(df_transformed, expected_transformed_data)
 
+    @pytest.mark.unit
     def test_null_handling(self, sample_data_with_nulls):
         """
-        Test 7: Verificar que los valores nulos se manejen correctamente con tipos nullable
+        Test 5: Verificar que los valores nulos se manejen correctamente con tipos nullable
         """
         df_transformed = transform_dataframe_types(sample_data_with_nulls.copy())
         
@@ -215,10 +214,10 @@ class TestTransformDataTypes:
         # Verificar que boolean nullable acepte NA
         assert pd.isna(df_transformed['shared_trip_authorized'].iloc[2])
 
+    @pytest.mark.unit
     def test_malformed_data_handling(self, sample_malformed_data):
         """
-        NUEVO TEST (Camino Triste):
-        Verificar que los datos malformados se coercionen a NA/NaT
+        Test 6: Verificar que los datos malformados se coercionen a NA/NaT
         (asumiendo que la función usa errors='coerce')
         """
         df_transformed = transform_dataframe_types(sample_malformed_data.copy())
@@ -272,10 +271,11 @@ class TestExtractTripsData:
             'dropoff_centroid_location': ['{"type":"Point","coordinates":[-87.6400,41.8900]}',
                                           '{"type":"Point","coordinates":[-87.6298,41.8781]}']
         })
-    
+
+    @pytest.mark.unit
     def test_parquet_preserves_data_types(self, mock_api_response, temp_output_dir, monkeypatch):
         """
-        Test 10 (SIN CAMBIOS): Verificar que los tipos se preserven al guardar y leer el parquet
+        Test 7: Verificar que los tipos se preserven al guardar y leer el parquet
         """
         # Mock de fetch_data_from_api
         def mock_fetch(*args, **kwargs):
