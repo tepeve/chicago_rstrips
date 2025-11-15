@@ -8,7 +8,8 @@ from chicago_rstrips.socrata_api_client import fetch_data_from_api
 from chicago_rstrips.config import START_DATE, END_DATE, CHIC_TNP_API_URL
 from chicago_rstrips.utils import get_raw_data_dir, transform_dataframe_types
 
-from shapely import GEOSException, from_wkt
+from shapely import GEOSException, to_wkt
+from shapely.geometry import shape
 
 # ============================================================
 ## Definiciones previas
@@ -22,6 +23,7 @@ api_endpoint = CHIC_TNP_API_URL
 type_mapping = {
     # IDs y strings
     'trip_id': 'string',
+    "batch_id": 'string',
     
     # Timestamps
     'trip_start_timestamp': 'datetime64[ns]',
@@ -47,7 +49,7 @@ type_mapping = {
     
     # Geolocation (mantener como string o parsear JSON)
     'pickup_centroid_location': 'string',
-    'dropoff_centroid_location': 'string',
+    'dropoff_centroid_location': 'string'
 }
 
 
@@ -55,15 +57,19 @@ type_mapping = {
 ## Bloque para crear census tracts centroids id's
 # ============================================================
 
-def _parse_lon_lat(value):
+def parse_lon_lat(value):
     if value is None:
         return None, None
     try:
-        point = from_wkt(str(value))
+        # Intentar parsear como GeoJSON (formato dict o string)
+        if isinstance(value, str):
+            geojson = ast.literal_eval(value)
+        else:
+            geojson = value
+        
+        point = shape(geojson)
         return point.x, point.y
-    except (GEOSException, TypeError, Exception):
-        # Si el string NO es WKT (ej. es JSON), fallará
-        # y devolverá None, None.
+    except (GEOSException, TypeError, json.JSONDecodeError, Exception):
         return None, None
 
 def _make_id(text, id_len):
@@ -81,7 +87,7 @@ def build_location_dimension(df: pd.DataFrame,
 
     rows = []
     for txt in vals:
-        lon, lat = _parse_lon_lat(txt)
+        lon, lat = parse_lon_lat(txt)
         rows.append({
             "location_id": _make_id(txt, id_len=id_len),
             "original_text": str(txt),
@@ -101,6 +107,7 @@ def map_location_keys(df: pd.DataFrame,
     trips_df = df.copy()
     trips_df["pickup_location_id"] = trips_df[pickup_col].map(mapping).astype("string")
     trips_df["dropoff_location_id"] = trips_df[dropoff_col].map(mapping).astype("string")
+    trips_df = trips_df.drop(columns=[pickup_col, dropoff_col])
     return trips_df
 
 
@@ -129,7 +136,7 @@ def update_location_dimension(existing_dim: pd.DataFrame,
 
     rows = []
     for txt in to_add:
-        lon, lat = _parse_lon_lat(txt)
+        lon, lat = parse_lon_lat(txt)
         rows.append({
             "location_id": _make_id(txt, id_len=id_len),
             "original_text": str(txt),
@@ -154,7 +161,8 @@ def extract_trips_data(output_filename="raw_trips_data.parquet",
                        locations_strategy: str = "incremental",  # 'incremental' | 'rebuild'
                        locations_filename: str = "centroid_locations.parquet",
                        start_timestamp: str = None,
-                       end_timestamp: str = None):
+                       end_timestamp: str = None,
+                       batch_id: str = None):
     """
     Extrae datos de trips y los guarda en formato parquet.
     
@@ -194,6 +202,10 @@ def extract_trips_data(output_filename="raw_trips_data.parquet",
     if df is not None:
         print(f"\nSe encontraron {len(df)} resultados.")
         
+        if batch_id:
+            df['batch_id'] = batch_id
+            print(f"Batch ID inyectado: {batch_id}")
+        
         # NUEVO: Transformar tipos de datos
         print("\n--- Transformando tipos de datos ---")
         df = transform_dataframe_types(df,type_mapping)
@@ -222,6 +234,8 @@ def extract_trips_data(output_filename="raw_trips_data.parquet",
                 dim_df, mapping = update_location_dimension(existing_dim, df)
             trips_df = map_location_keys(df, mapping)
 
+        if batch_id:
+            dim_df['batch_id'] = batch_id
 
             trips_df.to_parquet(trips_path, index=False)
             dim_df.to_parquet(loc_path, index=False)

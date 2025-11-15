@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS staging.stg_raw_trips (
     pickup_location_id VARCHAR(20),
     dropoff_location_id VARCHAR(20),
     -- Auditoría
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    batch_id VARCHAR(255)
 );
 
 -- Índices para mejorar consultas
@@ -50,7 +51,8 @@ CREATE TABLE IF NOT EXISTS staging.stg_raw_traffic (
     bus_count INTEGER,
     num_reads INTEGER,
     -- Auditoría
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    batch_id VARCHAR(255)
 );
 
 -- Índices para mejorar consultas
@@ -72,6 +74,7 @@ CREATE TABLE IF NOT EXISTS staging.stg_raw_weather (
     winddir DOUBLE PRECISION,
     conditions TEXT,
     -- Auditoría
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    batch_id VARCHAR(255)
 );
 

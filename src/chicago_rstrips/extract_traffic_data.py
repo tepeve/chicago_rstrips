@@ -26,6 +26,7 @@ type_mapping = {
     # Strings
     'region': 'string',
     'record_id': 'string',
+    "batch_id": 'string',    
     
     # Numéricos decimales
     'speed': 'float64'
@@ -107,6 +108,7 @@ def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
                        regions_strategy: str = "incremental",  # 'incremental' | 'rebuild'
                        start_timestamp: str = None,
                        end_timestamp: str = None,
+                       batch_id: str = None,
                        traffic_regions_filename: str = "traffic_regions.parquet"):
     """
     Extrae datos de trafico y los guarda en formato parquet.
@@ -140,6 +142,11 @@ def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
     if df is not None:
         print(f"\nSe encontraron {len(df)} resultados.")
         
+        if batch_id:
+            df['batch_id'] = batch_id
+            print(f"Batch ID inyectado: {batch_id}")
+
+
         # NUEVO: Transformar tipos de datos
         print("\n--- Transformando tipos de datos ---")
         df = transform_dataframe_types(df,type_mapping)
@@ -184,6 +191,7 @@ def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
                 'north': dim_df['north'],
                 'geometry_wkt': dim_df.geometry.to_wkt(),
                 'area_km2': areas_km2.round(2),
+                'batch_id': batch_id,
                 'crs': 'EPSG:4326'
             })
 

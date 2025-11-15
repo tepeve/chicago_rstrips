@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS dim_spatial.trips_locations (
     latitude DOUBLE PRECISION,
     source_type VARCHAR(30) DEFAULT 'census_centroid',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    batch_id VARCHAR(255)
 );
 
 -- Índice espacial si decides usar PostGIS más adelante
@@ -38,7 +39,8 @@ CREATE TABLE IF NOT EXISTS dim_spatial.traffic_regions (
     north DOUBLE PRECISION,
     geometry_wkt TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    batch_id VARCHAR(255)
 );
 
 

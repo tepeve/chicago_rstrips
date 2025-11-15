@@ -8,8 +8,8 @@ load_dotenv()
 
 # Date Range for Data Extraction
 START_DATE="2025-09-01T00:00:00.000"
-COLD_START_END_DATE="2025-09-10T00:00:00.000"
-END_DATE="2025-09-30T23:59:00.000"
+COLD_START_END_DATE="2025-09-03T23:59:00.000"
+END_DATE="2025-09-06T23:59:00.000"
 
 # ENDPOINT DE LA API DE TRIPS
 # https://dev.socrata.com/foundry/data.cityofchicago.org/6dvr-xwnh

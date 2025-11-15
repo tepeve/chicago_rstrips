@@ -106,16 +106,22 @@ def coldstart_etl_pipeline():
         )
 
     @task
-    def extract_trips() -> dict:
+    def extract_trips(batch_id: str) -> dict:
         from chicago_rstrips.extract_trips_data import extract_trips_data
         from chicago_rstrips.utils import get_raw_data_dir        
         print("Extrayendo datos de trips desde Socrata API...")     
         # Esta función ya guarda 'raw_trips_data.parquet' y 'trips_locations.parquet'
+
+        output_filename = f"raw_trips_data__{batch_id}.parquet"
+        locations_filename = f"trips_locations__{batch_id}.parquet"
+        
+        
         trips_path_str = extract_trips_data(
-            output_filename="raw_trips_data.parquet",
+            output_filename=output_filename,
             build_locations=True, 
             locations_strategy="rebuild",
-            locations_filename="trips_locations.parquet",
+            locations_filename=locations_filename,
+            batch_id=batch_id,
             start_timestamp=START_DATE,
             end_timestamp=COLD_START_END_DATE
         )
@@ -127,19 +133,25 @@ def coldstart_etl_pipeline():
         raw_dir = get_raw_data_dir()
         return {
             'trips_path': trips_path_str,
-            'locations_path': str(raw_dir / "trips_locations.parquet")
+            'locations_path': str(raw_dir / locations_filename)
         }
 
     @task
-    def extract_traffic() -> dict:
+    def extract_traffic(batch_id: str) -> dict:
         from chicago_rstrips.extract_traffic_data import extract_traffic_data
-        from chicago_rstrips.utils import get_raw_data_dir        
+        from chicago_rstrips.utils import get_raw_data_dir 
+
+        output_filename = f"stg_raw_traffic___{batch_id}.parquet"
+        regions_filename = f"traffic_regions___{batch_id}.parquet"
+
+
         print("Extrayendo datos de tráfico desde Socrata API...")
         traffic_path_str = extract_traffic_data(
-            output_filename="stg_raw_traffic.parquet",
+            output_filename=output_filename,
             build_regions=True, 
             regions_strategy="rebuild",
-            traffic_regions_filename="traffic_regions.parquet",
+            traffic_regions_filename=regions_filename,
+            batch_id=batch_id,
             start_timestamp=START_DATE,
             end_timestamp=COLD_START_END_DATE       
         )
@@ -150,16 +162,19 @@ def coldstart_etl_pipeline():
         raw_dir = get_raw_data_dir()
         return {
             'traffic_path': traffic_path_str,
-            'regions_path': str(raw_dir / "traffic_regions.parquet")
+            'regions_path': str(raw_dir / regions_filename)
         }
     
     @task
-    def extract_weather() -> dict:
+    def extract_weather(batch_id: str) -> dict:
         from chicago_rstrips.extract_weather_data import extract_weather_data
         print("Extrayendo datos de clima desde Visual Crossing Weather API...")
-        
+
+        output_filename = f"stg_raw_weather___{batch_id}.parquet"
+
         weather_path_str = extract_weather_data(
-            output_filename="stg_raw_weather.parquet",
+            output_filename=output_filename,
+            batch_id=batch_id,
             start_timestamp=START_DATE,
             end_timestamp=COLD_START_END_DATE       
         )
@@ -186,7 +201,7 @@ def coldstart_etl_pipeline():
             parquet_path=paths['trips_path'],
             table_name="stg_raw_trips",
             schema="staging",
-            if_exists="replace" # Usar append para staging inicial
+            if_exists="replace" 
         )
 
     @task
@@ -197,7 +212,7 @@ def coldstart_etl_pipeline():
             parquet_path=paths['locations_path'],
             table_name="trips_locations",
             schema="dim_spatial",
-            if_exists="replace" # Usar replace para dimensiones (ya que es 'rebuild')
+            if_exists="replace" 
         )
 
     @task
@@ -208,7 +223,7 @@ def coldstart_etl_pipeline():
             parquet_path=paths['traffic_path'],
             table_name="stg_raw_traffic",
             schema="staging",
-            if_exists="replace" # Usar append para staging inicial
+            if_exists="replace" 
         )
 
     @task
@@ -264,6 +279,8 @@ def coldstart_etl_pipeline():
 
     # --- FLUJO DEL DAG ---
     
+    # Pasamos el run_id de Airflow como el batch_id
+    run_id_str = "{{ run_id }}"
     
     ddl_task = setup_ddl()
     
@@ -284,9 +301,9 @@ def coldstart_etl_pipeline():
     visualize_op = visualize_task(city_df, stations_df, voronoi_df)
 
     # --- Extracción de datos dinámicos (pueden empezar después del DDL) ---
-    trips_paths = extract_trips()
-    traffic_paths = extract_traffic()
-    weather_paths = extract_weather()
+    trips_paths = extract_trips(batch_id=run_id_str)
+    traffic_paths = extract_traffic(batch_id=run_id_str)
+    weather_paths = extract_weather(batch_id=run_id_str)
     
     # Las extracciones deben esperar a que el DDL esté listo
     ddl_task >> [trips_paths, traffic_paths, weather_paths]

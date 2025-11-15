@@ -19,6 +19,7 @@ type_mapping = {
     "windspeed": 'string',
     "winddir": 'float64',
     "conditions": 'string',
+    "batch_id": 'string'
     }   
 
 def get_weather_stations():
@@ -72,7 +73,10 @@ def fetch_weather_api(location, start_str, end_str):
         return None
 
 
-def extract_weather_data(output_filename="stg_raw_weather.parquet", start_timestamp=None, end_timestamp=None):
+def extract_weather_data(output_filename="stg_raw_weather.parquet", 
+                         start_timestamp=None, 
+                         end_timestamp=None, 
+                         batch_id=None):
     
     start_date = datetime.strptime(start_timestamp[:10], "%Y-%m-%d") if start_timestamp else datetime.strptime(START_DATE[:10], "%Y-%m-%d")
     end_date = datetime.strptime(end_timestamp[:10], "%Y-%m-%d") if end_timestamp else datetime.strptime(END_DATE[:10], "%Y-%m-%d")
@@ -111,6 +115,11 @@ def extract_weather_data(output_filename="stg_raw_weather.parquet", start_timest
             print(f"Fallo al obtener datos para la ubicación: {location}")
     if all_weather:
         df = pd.DataFrame(all_weather)
+        
+        if batch_id:
+            df['batch_id'] = batch_id
+            print(f"Batch ID inyectado: {batch_id}")
+
         # aplicar transformaciones de tipos y nos quedamos con las columnas necesarias
         df = transform_dataframe_types(df,type_mapping)
         api_columns_to_keep = list(type_mapping.keys())
