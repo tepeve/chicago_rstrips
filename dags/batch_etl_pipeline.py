@@ -1,29 +1,34 @@
+from datetime import timedelta
 from airflow.decorators import dag, task
+from airflow.sensors.external_task import ExternalTaskSensor
+
 from pendulum import datetime
 from chicago_rstrips.extract_weather_data import extract_weather_data
 from chicago_rstrips.utils import get_outputs_dir, get_raw_data_dir
 
-# --- 1. Imports Limpios ---
-# Importar las funciones de extracción
 from chicago_rstrips.extract_trips_data import extract_trips_data
 from chicago_rstrips.extract_traffic_data import extract_traffic_data
+
+from chicago_rstrips.config import START_DATE, END_DATE
 
 # Importar los loaders GENÉRICOS y el runner DDL
 from chicago_rstrips.db_loader import get_engine, run_ddl, load_parquet_to_postgres
 
-# --- 2. Imports Redundantes ELIMINADOS ---
-# (Ya no importamos nada de load_facts_to_staging ni load_locations)
-
+default_args = {"owner": "tepeve", 
+                 "depends_on_past": False,
+                 "start_date": "COLD_START_END_DATE",
+                 "end_date": "END_DATE", 
+                 "retries":     1,
+                 "retry_delay": "timedelta(minutes=5)"}
 
 @dag(
     dag_id="etl_main_pipeline",
-    start_date=datetime(2025, 1, 1),
-    schedule=None,
-    catchup=False,
+    schedule_interval= "@daily",
+    catchup=True,
     tags=["etl", "trips", "incremental"],
     description="Pipeline ETL para viajes y tráfico de Chicago",
-    default_args={"owner": "tepeve", "retries": 1}
-)
+    default_args= default_args
+) 
 def etl_pipeline():
     """
     Pipeline ETL simplificado para datos de trips y tráfico:
@@ -33,19 +38,17 @@ def etl_pipeline():
     4. Carga los 4 Parquets a PostgreSQL.
     5. Verifica la carga y genera un reporte.
     """
-
-    @task
-    def setup_ddl():
-        """Ejecuta DDLs para Schemas, Staging y Dims Dinámicas."""
-        print("Ejecutando DDLs...")
-        engine = get_engine()
-        try:
-            run_ddl(engine, "create_schemas.sql")
-            run_ddl(engine, "create_staging_tables.sql")
-            run_ddl(engine, "create_dim_dynamic_tables.sql")
-        finally:
-            engine.dispose()
-        print("✓ DDLs ejecutados.")
+    wait_coldstart = ExternalTaskSensor(
+        task_id="wait_for_coldstart_etl_pipeline",
+        external_dag_id="coldstart_etl_pipeline",
+        external_task_id=None,  # Espera a que termine el DAG completo
+        mode="poke",
+        poke_interval=60,
+        timeout=60*60*2,  # 2 horas
+        allowed_states=["success"],
+        failed_states=["failed", "skipped"],
+        dag=None,
+    )
 
     @task
     def extract_trips() -> dict:
@@ -55,7 +58,9 @@ def etl_pipeline():
             output_filename="raw_trips_data.parquet",
             build_locations=True, 
             locations_strategy="rebuild",
-            locations_filename="trips_locations.parquet"
+            locations_filename="trips_locations.parquet",
+            start_timestamp={{data_interval_start}},
+            end_timestamp={{data_interval_end}}
         )
         
         if not trips_path_str:
@@ -76,7 +81,9 @@ def etl_pipeline():
             output_filename="stg_raw_traffic.parquet",
             build_regions=True, 
             regions_strategy="rebuild",
-            traffic_regions_filename="traffic_regions.parquet"
+            traffic_regions_filename="traffic_regions.parquet",
+            start_timestamp={{data_interval_start}},
+            end_timestamp={{data_interval_end}}          
         )
         
         if not traffic_path_str:
@@ -94,6 +101,8 @@ def etl_pipeline():
         
         weather_path_str = extract_weather_data(
             output_filename="stg_raw_weather.parquet",
+            start_timestamp={{ds}},
+            end_timestamp={{ds}},           
         )
         
         if not weather_path_str:
@@ -164,7 +173,7 @@ def etl_pipeline():
     @task
     def verify_load(paths: dict):
         """Verifica integridad de la carga."""
-        from chicago_rstrips.db_loader import get_engine
+       from chicago_rstrips.db_loader import get_engine
         from sqlalchemy import text
         
         print("🔍 Verificando integridad de la carga...")
@@ -203,7 +212,6 @@ def etl_pipeline():
     # ====================================================================
     
     # Crear todas las tablas PRIMERO
-    ddl_task = setup_ddl()
 
     # Rama de Trips
     trips_paths = extract_trips()
@@ -220,7 +228,7 @@ def etl_pipeline():
     weather_loaded = load_weather(weather_paths)
 
     # Dependencias de DDL: NADA se carga antes que las tablas existan
-    ddl_task >> [trips_loaded, locations_loaded, traffic_loaded, regions_loaded, weather_loaded]
+    wait_coldstart >> extract_trips()
     
     # Dependencias de Extracción
     trips_paths >> [trips_loaded, locations_loaded]
@@ -237,4 +245,4 @@ def etl_pipeline():
     # Generar reporte
     generate_report(verification)
 
-etl_pipeline()
+etl_pipeline()7

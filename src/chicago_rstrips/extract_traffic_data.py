@@ -11,17 +11,7 @@ import pandas as pd
 # Defino el endpoint de la API
 api_endpoint = CHIC_TRAFFIC_API_URL
 
-# Definir la query SoQL
-soql_query = f"""
-SELECT
-  time, region_id, speed, region, bus_count, num_reads, hour, record_id, 
-  west, east, north, south 
-WHERE
-  time BETWEEN '{START_DATE}' AND '{END_DATE}'
-    AND region_id IS NOT NULL
-ORDER BY time ASC
-LIMIT 1000
-"""
+
 
 type_mapping = {
 
@@ -115,6 +105,8 @@ def map_location_keys(df, mapping):
 def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
                        build_regions: bool = False,
                        regions_strategy: str = "incremental",  # 'incremental' | 'rebuild'
+                       start_timestamp: str = None,
+                       end_timestamp: str = None,
                        traffic_regions_filename: str = "traffic_regions.parquet"):
     """
     Extrae datos de trafico y los guarda en formato parquet.
@@ -125,6 +117,22 @@ def extract_traffic_data(output_filename="stg_raw_traffic.parquet",
     Returns:
         Path: Ruta del archivo guardado o None si no hay datos
     """
+    # Usar fechas de config si no se proveen
+    start_timestamp = start_timestamp if start_timestamp else START_DATE
+    end_timestamp = end_timestamp if end_timestamp else END_DATE
+
+        # Definir la query SoQL
+    soql_query = f"""
+    SELECT
+    time, region_id, speed, region, bus_count, num_reads, hour, record_id, 
+    west, east, north, south 
+    WHERE
+    time BETWEEN '{start_timestamp}' AND '{end_timestamp}'
+        AND region_id IS NOT NULL
+    ORDER BY time ASC
+    LIMIT 1000
+    """
+
     # Llamar a la función para obtener los datos
     df = fetch_data_from_api(soql_query, api_endpoint)
     

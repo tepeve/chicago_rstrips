@@ -18,22 +18,6 @@ from shapely import GEOSException, from_wkt
 # Defino el endpoint de la API
 api_endpoint = CHIC_TNP_API_URL
 
-# Defino la query SoQL
-soql_query = f"""
-SELECT
-  trip_id, trip_start_timestamp, trip_end_timestamp, trip_seconds, 
-  trip_miles, percent_time_chicago, percent_distance_chicago, 
-  shared_trip_authorized, trips_pooled,
-  pickup_centroid_location, dropoff_centroid_location,
-  pickup_community_area, dropoff_community_area, fare, tip, 
-  additional_charges, trip_total
-WHERE
-  trip_start_timestamp BETWEEN '{start_timestamp}' AND '{end_timestamp}'
-  AND trip_id LIKE '%a0'
-  AND percent_time_chicago = 1
-  LIMIT 100
-"""
-
 # Mapeo de datatypes del DataFrame luego de la extracción en json desde la api
 type_mapping = {
     # IDs y strings
@@ -180,8 +164,31 @@ def extract_trips_data(output_filename="raw_trips_data.parquet",
     Returns:
         Path: Ruta del archivo guardado o None si no hay datos
     """
+    # Usar fechas de config si no se proveen
+    start_timestamp = start_timestamp if start_timestamp else START_DATE
+    end_timestamp = end_timestamp if end_timestamp else END_DATE
+
+    # Defino la query SoQL
+    soql_query = f"""
+    SELECT
+    trip_id, trip_start_timestamp, trip_end_timestamp, trip_seconds, 
+    trip_miles, percent_time_chicago, percent_distance_chicago, 
+    shared_trip_authorized, trips_pooled,
+    pickup_centroid_location, dropoff_centroid_location,
+    pickup_community_area, dropoff_community_area, fare, tip, 
+    additional_charges, trip_total
+    WHERE
+    trip_start_timestamp BETWEEN '{start_timestamp}' AND '{end_timestamp}'
+    AND trip_id LIKE '%a0'
+    AND percent_time_chicago = 1
+    AND pickup_centroid_location IS NOT NULL
+    AND dropoff_centroid_location IS NOT NULL
+    """
+
+
+
     # Llamar a la función para obtener los datos
-    df = fetch_data_from_api(soql_query,api_endpoint, start_timestamp, end_timestamp)
+    df = fetch_data_from_api(soql_query,api_endpoint)
     
     # Convertir a parquet y almacenar en una base de datos si hay datos
     if df is not None:
