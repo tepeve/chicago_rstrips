@@ -16,8 +16,8 @@ type_mapping = {
     "temp": 'float64',
     "feelslike": 'float64',
     "precipprob": 'float64',
-    "windspeed": 'string',
-    "winddir": 'float64',
+    "windspeed": 'float64',
+    "winddir": 'string',
     "conditions": 'string',
     "batch_id": 'string'
     }   

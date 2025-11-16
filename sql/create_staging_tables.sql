@@ -64,17 +64,18 @@ CREATE INDEX IF NOT EXISTS stg_raw_traffic_region_id ON staging.stg_raw_traffic(
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS staging.stg_raw_weather (
-    record_id VARCHAR(20) PRIMARY KEY,
+    record_id VARCHAR(50) PRIMARY KEY,
     datetime TIMESTAMP,
-    station_id TIMESTAMP,
+    station_id VARCHAR(50),
     temp DOUBLE PRECISION,
     feelslike DOUBLE PRECISION,
     precipprob DOUBLE PRECISION,
-    windspeed VARCHAR(10),
+    windspeed TEXT,
     winddir DOUBLE PRECISION,
     conditions TEXT,
     -- Auditoría
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     batch_id VARCHAR(255)
 );
+
 

@@ -1,11 +1,15 @@
-
-
 CREATE SCHEMA IF NOT EXISTS dim_spatial;
 
 -- ============================================================
--- TABLA: Dimensión de Ubicaciones de Viajes
+-- 1. ELIMINA TABLAS DINÁMICAS (en orden)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS dim_spatial.trips_locations (
+DROP TABLE IF EXISTS dim_spatial.trips_locations CASCADE;
+DROP TABLE IF EXISTS dim_spatial.traffic_regions CASCADE;
+
+-- ============================================================
+-- 2. TABLA: Dimensión de Ubicaciones de Viajes
+-- ============================================================
+CREATE TABLE dim_spatial.trips_locations (
     location_id VARCHAR(20) PRIMARY KEY,
     original_text TEXT NOT NULL,
     longitude DOUBLE PRECISION,
@@ -16,7 +20,6 @@ CREATE TABLE IF NOT EXISTS dim_spatial.trips_locations (
     batch_id VARCHAR(255)
 );
 
--- Índice espacial si decides usar PostGIS más adelante
 CREATE INDEX IF NOT EXISTS idx_dimlocation_location_coords ON dim_spatial.trips_locations(longitude, latitude);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_dimlocation_location_text ON dim_spatial.trips_locations(original_text);
 
@@ -27,24 +30,23 @@ COMMENT ON COLUMN dim_spatial.trips_locations.longitude IS 'Longitud parseada (N
 COMMENT ON COLUMN dim_spatial.trips_locations.latitude IS 'Latitud parseada (NULL si no se pudo extraer)';
 
 -- ============================================================
--- TABLA: Dimensión de regiones de trafico
+-- 3. TABLA: Dimensión de regiones de trafico
 -- ============================================================
-CREATE TABLE IF NOT EXISTS dim_spatial.traffic_regions (
+CREATE TABLE dim_spatial.traffic_regions (
     region_id INTEGER PRIMARY KEY,
     region TEXT NOT NULL,
-    description TEXT NOT NULL,
     west DOUBLE PRECISION,
     east DOUBLE PRECISION,
     south DOUBLE PRECISION,
     north DOUBLE PRECISION,
-    geometry_wkt TEXT NOT NULL,
+    geometry_wkt TEXT,
+    area_km2 DOUBLE PRECISION,
+    crs VARCHAR(20) DEFAULT 'EPSG:4326',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     batch_id VARCHAR(255)
 );
 
-
-
-COMMENT ON TABLE dim_spatial.traffic_regions IS 'Dimensión de regiones de tránsitoo basadas en áreas definidas por la ciudad';
+COMMENT ON TABLE dim_spatial.traffic_regions IS 'Dimensión de regiones de tránsito basadas en áreas definidas por la ciudad';
 COMMENT ON COLUMN dim_spatial.traffic_regions.region_id IS 'Número identificador de la región de tráfico - ya servido por el proveedor de datos';
 COMMENT ON COLUMN dim_spatial.traffic_regions.geometry_wkt IS 'Geometría en formato Well-Known Text (WKT) representando el polígono de la región';
