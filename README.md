@@ -75,7 +75,7 @@ El sistema se basa en dos DAGs de Airflow principales que orquestan todo el fluj
 
 ```mermaid
 graph LR
-    subgraph Cold Start (DAG: coldstart_etl_pipeline)
+    subgraph coldstart_etl_pipeline
         A[setup_ddl: Crear Schemas y Tablas] --> B(generate_static_features: City, Stations, Voronoi);
         B --> C(load_static_features: Cargar a dim_spatial);
         A --> D(extract_historical_data: Trips, Traffic, Weather);
@@ -87,7 +87,7 @@ graph LR
         H --> I(generate_report);
     end
 
-    subgraph Batch Diario (DAG: batch_etl_pipeline)
+    subgraph batch_etl_pipeline
         J(wait_for_coldstart: ExternalTaskSensor) --> K(extract_daily_data: Trips, Traffic, Weather);
         K --> L(load_to_staging_append);
         L --> M(verify_staging_load);
