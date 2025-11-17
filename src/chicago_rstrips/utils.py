@@ -51,40 +51,57 @@ def get_geospatial_features_dir():
 
 def transform_dataframe_types(df, type_mapping):
     """
-    Función genérica para convertir tipos de datos de un DataFrame
-    basado en un diccionario de mapeo.
+    Transforma los tipos de datos de un DataFrame según un mapeo especificado.
     
     Args:
-        df (pd.DataFrame): DataFrame de entrada
-        type_mapping (dict): Diccionario {col_name: dtype_string}
-        
+        df: DataFrame a transformar
+        type_mapping: Dict con {columna: tipo_destino}
+    
     Returns:
-        pd.DataFrame: DataFrame con tipos corregidos
+        DataFrame con tipos transformados
     """
+    df_copy = df.copy()
+    
     for col, dtype in type_mapping.items():
-        if col not in df.columns:
+        if col not in df_copy.columns:
+            print(f"Advertencia: Columna '{col}' no existe en el DataFrame")
             continue
+            
         try:
-            # Fechas
-            if "timestamp" in col or "date" in col:
-                df[col] = pd.to_datetime(df[col], errors="coerce")
-            # Booleanos
-            elif dtype == bool:
-                df[col] = df[col].map({"true": True, "false": False}).astype("boolean")
-            # Strings
-            elif dtype == str:
-                df[col] = df[col].astype("string")
-            # Flotantes
-            elif dtype == float:
-                df[col] = pd.to_numeric(df[col], errors="coerce").astype("float64")
-            # Enteros
-            elif dtype == int:
-                df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
+            if dtype == 'datetime64[ns]':
+                df_copy[col] = pd.to_datetime(df_copy[col], errors="coerce")
+            elif dtype == 'Int64':
+                # Convertir a numérico, redondear si tiene decimales, luego a Int64
+                numeric_values = pd.to_numeric(df_copy[col], errors='coerce')
+                # Redondear floats antes de convertir a Int64
+                df_copy[col] = numeric_values.round().astype('Int64')
+            elif dtype == 'float64':
+                df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
+            elif dtype == 'string':
+                df_copy[col] = df_copy[col].astype('string')
+            elif dtype == 'boolean':
+                # Manejar booleanos correctamente
+                df_copy[col] = df_copy[col].map({
+                    'true': True, 'false': False, 
+                    True: True, False: False,
+                    'True': True, 'False': False,
+                    '1': True, '0': False,
+                    1: True, 0: False
+                })
+                df_copy[col] = df_copy[col].astype('boolean')
             else:
-                df[col] = df[col].astype(dtype)
+                df_copy[col] = df_copy[col].astype(dtype)
         except Exception as e:
             print(f"Advertencia: No se pudo convertir columna '{col}' a {dtype}: {e}")
-    return df
+            # Intentar conversión más permisiva
+            if dtype in ['Int64', 'float64']:
+                df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
+                if dtype == 'Int64':
+                    df_copy[col] = df_copy[col].round().astype('Int64')
+            elif dtype == 'datetime64[ns]':
+                df_copy[col] = pd.to_datetime(df_copy[col], errors='coerce')
+    
+    return df_copy
 
 # ============================================================
 # Funciones para consultas geoespaciales

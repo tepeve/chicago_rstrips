@@ -26,6 +26,11 @@ data/raw/*
 data/processed/*
 !data/processed/.gitkeep
 
+# tests artifacts
+.coverage
+coverage.xml
+
+
 # Archivos de datos en cualquier ubicación
 *.csv
 *.json

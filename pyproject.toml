@@ -1,13 +1,14 @@
 [project]
-name = "chicago-rstrips"
+name = "chicago_rstrips"
 version = "0.1.0"
-description = "Add your description here"
+description = "ETL para extraer trips desde Socrata y almacenarlos en bases postgre local"
 requires-python = ">=3.11"
 dependencies = [
     "apache-airflow~=2.11",
     "boto3",
     "numpy",
     "pandas",
+    "pip",
     "psycopg2-binary",
     "requests>=2.32.5",
     "sodapy",
@@ -33,3 +34,8 @@ packages = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "unit: Unit tests that don't require external dependencies",
+    "integration: Integration tests that require database",
+    "ci: Tests to run in CI/CD"
+]

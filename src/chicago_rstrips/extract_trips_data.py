@@ -232,24 +232,28 @@ def extract_trips_data(output_filename="raw_trips_data.parquet",
             else:
                 existing_dim = pd.read_parquet(loc_path) if loc_path.exists() else None
                 dim_df, mapping = update_location_dimension(existing_dim, df)
+            
             trips_df = map_location_keys(df, mapping)
-
-        if batch_id:
-            dim_df['batch_id'] = batch_id
-
-            trips_df.to_parquet(trips_path, index=False)
+            
+            # Agregar batch_id a dimension si existe
+            if batch_id:
+                dim_df['batch_id'] = batch_id
+            
+            # Guardar dimension
             dim_df.to_parquet(loc_path, index=False)
-            print(f"Parquet viajes (sin geometrías): {trips_path}")
-            print(f"Parquet dimensión ubicaciones: {loc_path}")
+            print(f"Dimension de ubicaciones guardada en {loc_path}")
+            
+            # Guardar trips con keys
+            trips_df.to_parquet(trips_path, index=False)
+            print(f"Trips con location keys guardados en {trips_path}")
         else:
-            # Guardar dataset crudo con geometrías intactas
+            # Guardar trips sin transformar ubicaciones
             df.to_parquet(trips_path, index=False)
-            print(f"Parquet viajes (crudo con geometrías): {trips_path}")
+            print(f"Trips guardados en {trips_path}")
 
         return str(trips_path)
-        
     else:
-        print("No se encontraron datos para guardar.")
+        print("No se encontraron datos que cumplan con los criterios de la consulta.")
         return None
 
 # Para ejecutar como script independiente

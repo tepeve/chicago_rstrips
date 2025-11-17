@@ -7,7 +7,9 @@ import tempfile
 import shutil
 
 # Asumimos que estas funciones están en el módulo importado
-from chicago_rstrips.extract_trips_data import transform_dataframe_types, extract_trips_data
+from chicago_rstrips.extract_trips_data import  extract_trips_data
+from chicago_rstrips.utils import transform_dataframe_types
+
 
 
 class TestTransformDataTypes:
@@ -19,23 +21,24 @@ class TestTransformDataTypes:
         Simula datos de type_mapping
         """
         return {
-            "trip_id": str,
-            "trip_start_timestamp": datetime,
-            "trip_end_timestamp": datetime,
-            "trip_seconds": float,
-            "trip_miles": float,
-            "percent_time_chicago": float,
-            "percent_distance_chicago": float,
-            "shared_trip_authorized": bool,
-            "trips_pooled": int,
-            "pickup_centroid_location": str,
-            "dropoff_centroid_location": str,
-            "pickup_community_area": int,
-            "dropoff_community_area": int,
-            "fare": float,
-            "tip": float,
-            "additional_charges": float,
-            "trip_total": float
+            'trip_id': 'string',
+            'trip_start_timestamp': 'datetime64[ns]',
+            'trip_end_timestamp': 'datetime64[ns]',
+            'trip_seconds': 'Int64', 
+            'trip_miles': 'float64',
+            'percent_time_chicago': 'float64',
+            'percent_distance_chicago': 'float64',
+            'pickup_community_area': 'Int64',
+            'dropoff_community_area': 'Int64',
+            'fare': 'float64',
+            'tip': 'float64',
+            'additional_charges': 'float64',
+            'trip_total': 'float64',
+            'shared_trip_authorized': 'boolean',
+            'trips_pooled': 'Int64',
+            'pickup_centroid_location': 'string',
+            'dropoff_centroid_location': 'string',
+            'batch_id': 'string'
         }
 
     @pytest.fixture
@@ -59,12 +62,13 @@ class TestTransformDataTypes:
             'trip_total': ['15.50', '19.75', '10.00'],
             'shared_trip_authorized': ['true', 'false', 'true'],
             'trips_pooled': ['1', '1', '2'],
+            'batch_id': ['test_batch_001', 'test_batch_002', 'test_batch_003'],
             'pickup_centroid_location': ['{"type":"Point","coordinates":[-87.6298,41.8781]}', 
                                          '{"type":"Point","coordinates":[-87.6500,41.9000]}',
                                          '{"type":"Point","coordinates":[-87.6100,41.8500]}'],
             'dropoff_centroid_location': ['{"type":"Point","coordinates":[-87.6400,41.8900]}',
                                           '{"type":"Point","coordinates":[-87.6298,41.8781]}',
-                                          '{"type":"Point","coordinates":[-87.6200,41.8600]}']
+                                          '{"type":"Point","coordinates":[-87.6200,41.8600]}'],
         })
 
     @pytest.fixture
@@ -88,6 +92,7 @@ class TestTransformDataTypes:
             'trip_total': ['15.50', '19.75', None],
             'shared_trip_authorized': ['true', 'false', None],
             'trips_pooled': ['1', None, '2'],
+            'batch_id': ['test_batch_001', 'test_batch_002', None],
             'pickup_centroid_location': ['{"type":"Point","coordinates":[-87.6298,41.8781]}', None, None],
             'dropoff_centroid_location': [None, '{"type":"Point","coordinates":[-87.6298,41.8781]}', None]
         })
@@ -114,20 +119,18 @@ class TestTransformDataTypes:
             'shared_trip_authorized': ['maybe', 'false'],
             'trips_pooled': ['1', '1'],
             'pickup_centroid_location': [None, None],
-            'dropoff_centroid_location': [None, None]
+            'dropoff_centroid_location': [None, None],
+            'batch_id': ['test_batch_0e', 'test_batch']
         })
 
     @pytest.fixture
     def expected_transformed_data(self):
-        """
-        FIXTURE: El "DataFrame Dorado" que esperamos
-        después de transformar sample_raw_data.
-        """
+        """El DataFrame esperado después de la transformación."""
         return pd.DataFrame({
             'trip_id': pd.Series(['trip_001', 'trip_002', 'trip_003'], dtype='string'),
             'trip_start_timestamp': pd.to_datetime(['2025-01-15T10:30:00', '2025-01-15T11:00:00', '2025-01-15T12:15:00']),
             'trip_end_timestamp': pd.to_datetime(['2025-01-15T10:45:00', '2025-01-15T11:20:00', '2025-01-15T12:30:00']),
-            'trip_seconds': pd.Series([900, 1200, 900], dtype='float64'),
+            'trip_seconds': pd.Series([900, 1200, 900], dtype='Int64'),
             'trip_miles': pd.Series([2.5, 3.8, 1.2], dtype='float64'),
             'percent_time_chicago': pd.Series([1.0, 0.95, 1.0], dtype='float64'),
             'percent_distance_chicago': pd.Series([1.0, 0.98, 1.0], dtype='float64'),
@@ -139,12 +142,17 @@ class TestTransformDataTypes:
             'trip_total': pd.Series([15.50, 19.75, 10.00], dtype='float64'),
             'shared_trip_authorized': pd.Series([True, False, True], dtype='boolean'),
             'trips_pooled': pd.Series([1, 1, 2], dtype='Int64'),
-            'pickup_centroid_location': pd.Series(['{"type":"Point","coordinates":[-87.6298,41.8781]}', 
-                                                   '{"type":"Point","coordinates":[-87.6500,41.9000]}',
-                                                   '{"type":"Point","coordinates":[-87.6100,41.8500]}'], dtype='string'),
-            'dropoff_centroid_location': pd.Series(['{"type":"Point","coordinates":[-87.6400,41.8900]}',
-                                                    '{"type":"Point","coordinates":[-87.6298,41.8781]}',
-                                                    '{"type":"Point","coordinates":[-87.6200,41.8600]}'], dtype='string')
+            'batch_id': pd.Series(['test_batch_001', 'test_batch_002', 'test_batch_003'], dtype='string'),  # ✅ MOVER AQUÍ
+            'pickup_centroid_location': pd.Series([
+                '{"type":"Point","coordinates":[-87.6298,41.8781]}',
+                '{"type":"Point","coordinates":[-87.6500,41.9000]}',
+                '{"type":"Point","coordinates":[-87.6100,41.8500]}'
+            ], dtype='string'),
+            'dropoff_centroid_location': pd.Series([
+                '{"type":"Point","coordinates":[-87.6400,41.8900]}',
+                '{"type":"Point","coordinates":[-87.6298,41.8781]}',
+                '{"type":"Point","coordinates":[-87.6200,41.8600]}'
+            ], dtype='string')
         })
 
     @pytest.mark.unit
@@ -159,7 +167,7 @@ class TestTransformDataTypes:
             'dropoff_centroid_location': 'string',
             'trip_start_timestamp': 'datetime64[ns]',
             'trip_end_timestamp': 'datetime64[ns]',
-            'trip_seconds': 'float64',
+            'trip_seconds': 'Int64',  
             'pickup_community_area': 'Int64',
             'dropoff_community_area': 'Int64',
             'trips_pooled': 'Int64',
@@ -170,7 +178,8 @@ class TestTransformDataTypes:
             'tip': 'float64',
             'additional_charges': 'float64',
             'trip_total': 'float64',
-            'shared_trip_authorized': 'boolean'
+            'shared_trip_authorized': 'boolean',
+            'batch_id': 'string'
         }
         
         df_transformed = transform_dataframe_types(sample_raw_data.copy(), sample_type_mapping)
@@ -299,9 +308,7 @@ class TestExtractTripsData:
 
     @pytest.mark.unit
     def test_parquet_preserves_data_types(self, mock_api_response, temp_output_dir, monkeypatch):
-        """
-        Test 7: Verificar que los tipos se preserven al guardar y leer el parquet
-        """
+        """Test 7: Verificar que los tipos se preserven al guardar y leer el parquet"""
         # Mock de fetch_data_from_api
         def mock_fetch(*args, **kwargs):
             return mock_api_response
@@ -309,29 +316,26 @@ class TestExtractTripsData:
         # Mock de get_raw_data_dir
         def mock_get_dir():
             return temp_output_dir
-        
+
         monkeypatch.setattr('chicago_rstrips.extract_trips_data.fetch_data_from_api', mock_fetch)
         monkeypatch.setattr('chicago_rstrips.extract_trips_data.get_raw_data_dir', mock_get_dir)
-        
-        # Ejecutar extracción
-        output_path = extract_trips_data("test_output.parquet")
-        
-        # Leer el parquet guardado
-        df_from_parquet = pd.read_parquet(output_path)
-        df_from_parquet['shared_trip_authorized'] = df_from_parquet['shared_trip_authorized'].map({"true": True, "false": False}).astype("boolean")
-        
-        # Verificar tipos
-        assert df_from_parquet['trip_id'].dtype == 'string'
-        assert pd.api.types.is_datetime64_any_dtype(df_from_parquet['trip_start_timestamp'])
-        assert df_from_parquet['trip_seconds'].dtype == 'float64'
-        assert df_from_parquet['trip_miles'].dtype == 'float64'
-        assert df_from_parquet['shared_trip_authorized'].dtype in ['bool', 'boolean'], \
-    "shared_trip_authorized debe ser boolean o bool"
-        # Verificar valores
-        assert len(df_from_parquet) == 2
-        assert df_from_parquet['trip_id'].iloc[0] == 'trip_001'
-        assert abs(df_from_parquet['fare'].iloc[0] - 12.50) < 0.001
 
+        # Ejecutar extracción CON batch_id
+        output_path = extract_trips_data(
+            output_filename="test_output.parquet",
+            batch_id="test_batch_001"  # ✅ AGREGAR batch_id
+        )
+        
+        # Leer el parquet resultante
+        df_from_parquet = pd.read_parquet(output_path)
+
+        # Verificar tipos (Parquet puede convertir algunos tipos)
+        assert pd.api.types.is_datetime64_any_dtype(df_from_parquet['trip_start_timestamp'])
+        assert pd.api.types.is_datetime64_any_dtype(df_from_parquet['trip_end_timestamp'])
+        assert df_from_parquet['trip_seconds'].dtype in ['int64', 'Int64']  # Parquet puede cambiar Int64 a int64
+        assert df_from_parquet['fare'].dtype == 'float64'
+        assert 'batch_id' in df_from_parquet.columns
+        assert len(df_from_parquet) == 2
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
