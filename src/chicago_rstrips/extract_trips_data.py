@@ -8,7 +8,8 @@ from chicago_rstrips.socrata_api_client import fetch_data_from_api
 from chicago_rstrips.config import START_DATE, END_DATE, CHIC_TNP_API_URL
 from chicago_rstrips.utils import get_raw_data_dir, transform_dataframe_types
 
-from shapely import GEOSException, from_wkt
+from shapely import GEOSException, to_wkt
+from shapely.geometry import shape
 
 # ============================================================
 ## Definiciones previas
@@ -18,26 +19,11 @@ from shapely import GEOSException, from_wkt
 # Defino el endpoint de la API
 api_endpoint = CHIC_TNP_API_URL
 
-# Defino la query SoQL
-soql_query = f"""
-SELECT
-  trip_id, trip_start_timestamp, trip_end_timestamp, trip_seconds, 
-  trip_miles, percent_time_chicago, percent_distance_chicago, 
-  shared_trip_authorized, trips_pooled,
-  pickup_centroid_location, dropoff_centroid_location,
-  pickup_community_area, dropoff_community_area, fare, tip, 
-  additional_charges, trip_total
-WHERE
-  trip_start_timestamp BETWEEN '{start_timestamp}' AND '{end_timestamp}'
-  AND trip_id LIKE '%a0'
-  AND percent_time_chicago = 1
-  LIMIT 100
-"""
-
 # Mapeo de datatypes del DataFrame luego de la extracción en json desde la api
 type_mapping = {
     # IDs y strings
     'trip_id': 'string',
+    "batch_id": 'string',
     
     # Timestamps
     'trip_start_timestamp': 'datetime64[ns]',
@@ -63,7 +49,7 @@ type_mapping = {
     
     # Geolocation (mantener como string o parsear JSON)
     'pickup_centroid_location': 'string',
-    'dropoff_centroid_location': 'string',
+    'dropoff_centroid_location': 'string'
 }
 
 
@@ -71,15 +57,19 @@ type_mapping = {
 ## Bloque para crear census tracts centroids id's
 # ============================================================
 
-def _parse_lon_lat(value):
+def parse_lon_lat(value):
     if value is None:
         return None, None
     try:
-        point = from_wkt(str(value))
+        # Intentar parsear como GeoJSON (formato dict o string)
+        if isinstance(value, str):
+            geojson = ast.literal_eval(value)
+        else:
+            geojson = value
+        
+        point = shape(geojson)
         return point.x, point.y
-    except (GEOSException, TypeError, Exception):
-        # Si el string NO es WKT (ej. es JSON), fallará
-        # y devolverá None, None.
+    except (GEOSException, TypeError, json.JSONDecodeError, Exception):
         return None, None
 
 def _make_id(text, id_len):
@@ -97,7 +87,7 @@ def build_location_dimension(df: pd.DataFrame,
 
     rows = []
     for txt in vals:
-        lon, lat = _parse_lon_lat(txt)
+        lon, lat = parse_lon_lat(txt)
         rows.append({
             "location_id": _make_id(txt, id_len=id_len),
             "original_text": str(txt),
@@ -117,6 +107,7 @@ def map_location_keys(df: pd.DataFrame,
     trips_df = df.copy()
     trips_df["pickup_location_id"] = trips_df[pickup_col].map(mapping).astype("string")
     trips_df["dropoff_location_id"] = trips_df[dropoff_col].map(mapping).astype("string")
+    trips_df = trips_df.drop(columns=[pickup_col, dropoff_col])
     return trips_df
 
 
@@ -145,7 +136,7 @@ def update_location_dimension(existing_dim: pd.DataFrame,
 
     rows = []
     for txt in to_add:
-        lon, lat = _parse_lon_lat(txt)
+        lon, lat = parse_lon_lat(txt)
         rows.append({
             "location_id": _make_id(txt, id_len=id_len),
             "original_text": str(txt),
@@ -170,7 +161,8 @@ def extract_trips_data(output_filename="raw_trips_data.parquet",
                        locations_strategy: str = "incremental",  # 'incremental' | 'rebuild'
                        locations_filename: str = "centroid_locations.parquet",
                        start_timestamp: str = None,
-                       end_timestamp: str = None):
+                       end_timestamp: str = None,
+                       batch_id: str = None):
     """
     Extrae datos de trips y los guarda en formato parquet.
     
@@ -180,12 +172,39 @@ def extract_trips_data(output_filename="raw_trips_data.parquet",
     Returns:
         Path: Ruta del archivo guardado o None si no hay datos
     """
+    # Usar fechas de config si no se proveen
+    start_timestamp = start_timestamp if start_timestamp else START_DATE
+    end_timestamp = end_timestamp if end_timestamp else END_DATE
+
+    # Defino la query SoQL
+    soql_query = f"""
+    SELECT
+    trip_id, trip_start_timestamp, trip_end_timestamp, trip_seconds, 
+    trip_miles, percent_time_chicago, percent_distance_chicago, 
+    shared_trip_authorized, trips_pooled,
+    pickup_centroid_location, dropoff_centroid_location,
+    pickup_community_area, dropoff_community_area, fare, tip, 
+    additional_charges, trip_total
+    WHERE
+    trip_start_timestamp BETWEEN '{start_timestamp}' AND '{end_timestamp}'
+    AND trip_id LIKE '%a0'
+    AND percent_time_chicago = 1
+    AND pickup_centroid_location IS NOT NULL
+    AND dropoff_centroid_location IS NOT NULL
+    """
+
+
+
     # Llamar a la función para obtener los datos
-    df = fetch_data_from_api(soql_query,api_endpoint, start_timestamp, end_timestamp)
+    df = fetch_data_from_api(soql_query,api_endpoint)
     
     # Convertir a parquet y almacenar en una base de datos si hay datos
     if df is not None:
         print(f"\nSe encontraron {len(df)} resultados.")
+        
+        if batch_id:
+            df['batch_id'] = batch_id
+            print(f"Batch ID inyectado: {batch_id}")
         
         # NUEVO: Transformar tipos de datos
         print("\n--- Transformando tipos de datos ---")
@@ -213,22 +232,28 @@ def extract_trips_data(output_filename="raw_trips_data.parquet",
             else:
                 existing_dim = pd.read_parquet(loc_path) if loc_path.exists() else None
                 dim_df, mapping = update_location_dimension(existing_dim, df)
+            
             trips_df = map_location_keys(df, mapping)
-
-
-            trips_df.to_parquet(trips_path, index=False)
+            
+            # Agregar batch_id a dimension si existe
+            if batch_id:
+                dim_df['batch_id'] = batch_id
+            
+            # Guardar dimension
             dim_df.to_parquet(loc_path, index=False)
-            print(f"Parquet viajes (sin geometrías): {trips_path}")
-            print(f"Parquet dimensión ubicaciones: {loc_path}")
+            print(f"Dimension de ubicaciones guardada en {loc_path}")
+            
+            # Guardar trips con keys
+            trips_df.to_parquet(trips_path, index=False)
+            print(f"Trips con location keys guardados en {trips_path}")
         else:
-            # Guardar dataset crudo con geometrías intactas
+            # Guardar trips sin transformar ubicaciones
             df.to_parquet(trips_path, index=False)
-            print(f"Parquet viajes (crudo con geometrías): {trips_path}")
+            print(f"Trips guardados en {trips_path}")
 
         return str(trips_path)
-        
     else:
-        print("No se encontraron datos para guardar.")
+        print("No se encontraron datos que cumplan con los criterios de la consulta.")
         return None
 
 # Para ejecutar como script independiente

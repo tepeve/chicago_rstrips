@@ -21,9 +21,9 @@ def get_engine():
     return create_engine(db_url)
 
 
-def run_ddl(engine, ddl_path):
+def run_ddl(engine, ddl_path, params=None):
     """
-    Ejecuta un archivo DDL SQL en modo AUTOCOMMIT
+    Ejecuta un archivo DDL SQL en modo AUTOCOMMIT. Soporta parámetros opcionales.
     """
     ddl_full_path = Path(__file__).parent.parent.parent / "sql" / ddl_path
     if not ddl_full_path.exists():
@@ -34,7 +34,7 @@ def run_ddl(engine, ddl_path):
     
     try:
         with engine.execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
-            conn.execute(text(ddl))
+            conn.execute(text(ddl), params if params is not None else {})
             
         print(f"✓ DDL ejecutado desde {ddl_path}")
 

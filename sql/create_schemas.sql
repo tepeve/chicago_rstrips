@@ -1,7 +1,11 @@
 
-
-
-
 CREATE SCHEMA IF NOT EXISTS staging;
 
 CREATE SCHEMA IF NOT EXISTS dim_spatial;
+
+CREATE SCHEMA IF NOT EXISTS fact_tables;
+
+CREATE SCHEMA IF NOT EXISTS datamarts;
+
+
+

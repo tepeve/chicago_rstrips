@@ -1,6 +1,6 @@
 import pandas as pd
 from sqlalchemy import text
-from chicago_rstrips.config import START_DATE, WEATHER_API_KEY
+from chicago_rstrips.config import START_DATE, END_DATE, WEATHER_API_KEY
 from chicago_rstrips.db_loader import get_engine
 from chicago_rstrips.utils import get_raw_data_dir, transform_dataframe_types
 from datetime import datetime, timedelta
@@ -16,9 +16,10 @@ type_mapping = {
     "temp": 'float64',
     "feelslike": 'float64',
     "precipprob": 'float64',
-    "windspeed": 'string',
-    "winddir": 'float64',
+    "windspeed": 'float64',
+    "winddir": 'string',
     "conditions": 'string',
+    "batch_id": 'string'
     }   
 
 def get_weather_stations():
@@ -32,7 +33,7 @@ def get_weather_stations():
     return df
 
 
-def fetch_weather_api(location, start_date, end_date):
+def fetch_weather_api(location, start_str, end_str):
     """
     Fetch weather data from the Visual Crossing Weather API for a given location and date range.
     documentation: https://www.visualcrossing.com/resources/documentation/weather-api/timeline-weather-api/
@@ -48,8 +49,7 @@ def fetch_weather_api(location, start_date, end_date):
     api_key = WEATHER_API_KEY
     base_url = "https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/"
     # Convert dates to string in YYYY-MM-DD format
-    start_str = start_date.strftime("%Y-%m-%d")
-    end_str = end_date.strftime("%Y-%m-%d")
+    
     url = (f"{base_url}{location}/{start_str}/{end_str}?"
            f"unitGroup=metric&"
            f"contentType=json&"
@@ -73,9 +73,14 @@ def fetch_weather_api(location, start_date, end_date):
         return None
 
 
-def extract_weather_data(output_filename="stg_raw_weather.parquet"):
-    start_date = datetime.strptime(START_DATE[:10], "%Y-%m-%d")
-    end_date = start_date + timedelta(days=2)
+def extract_weather_data(output_filename="stg_raw_weather.parquet", 
+                         start_timestamp=None, 
+                         end_timestamp=None, 
+                         batch_id=None):
+    
+    start_date = datetime.strptime(start_timestamp[:10], "%Y-%m-%d") if start_timestamp else datetime.strptime(START_DATE[:10], "%Y-%m-%d")
+    end_date = datetime.strptime(end_timestamp[:10], "%Y-%m-%d") if end_timestamp else datetime.strptime(END_DATE[:10], "%Y-%m-%d")
+
     stations_df = get_weather_stations()
     locations = [
         (row.station_id, f"{row.latitude},{row.longitude}")
@@ -85,7 +90,9 @@ def extract_weather_data(output_filename="stg_raw_weather.parquet"):
     all_weather = []
 
     for station_id, location in locations:
-        weather_data = fetch_weather_api(location, start_date, end_date)
+        weather_data = fetch_weather_api(location, 
+                                        start_date.strftime("%Y-%m-%d"),
+                                        end_date .strftime("%Y-%m-%d"))
         if weather_data:
             print("Solicitud a la API exitosa")
             # Si la API devuelve un dict con 'days', extrae esa lista
@@ -108,6 +115,11 @@ def extract_weather_data(output_filename="stg_raw_weather.parquet"):
             print(f"Fallo al obtener datos para la ubicación: {location}")
     if all_weather:
         df = pd.DataFrame(all_weather)
+        
+        if batch_id:
+            df['batch_id'] = batch_id
+            print(f"Batch ID inyectado: {batch_id}")
+
         # aplicar transformaciones de tipos y nos quedamos con las columnas necesarias
         df = transform_dataframe_types(df,type_mapping)
         api_columns_to_keep = list(type_mapping.keys())
