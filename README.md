@@ -176,7 +176,6 @@ El pipeline construye y puebla una base de datos PostgreSQL con los siguientes s
 
 ### Zoom-in a cómo se vinculal las de hechos trips, traffic y weather:
 
-
 ```mermaid
 erDiagram
     direction TB
