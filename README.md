@@ -1,8 +1,4 @@
 # Chicago Ridesharing Trips ETL
-
-[![Tests](https://github.com/tu-usuario/chicago_rstrips/workflows/Tests/badge.svg)](https://github.com/tu-usuario/chicago_rstrips/actions)
-[![codecov](https://codecov.io/gh/tu-usuario/chicago_rstrips/branch/main/graph/badge.svg)](https://codecov.io/gh/tu-usuario/chicago_rstrips)
-
 Proyecto de data engineering que implementa un pipeline ETL/ELT para extraer, procesar y analizar datos abierto de viajes de proveedores de redes de transporte (TNP) en la ciudad de Chicago.
 
 ## 🎯 Propósito del Pipeline

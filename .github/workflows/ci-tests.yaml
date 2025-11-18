@@ -38,7 +38,7 @@ jobs:
           export POSTGRES_LOCAL_USER=dummy
           export POSTGRES_LOCAL_PASSWORD=dummy
           export POSTGRES_LOCAL_DB=dummy
-          uv run pytest -m "unit or ci" --cov=src/chicago_rstrips --cov-report=xml --cov-report=term-missing
+          uv run pytest -m "unit or ci" --cov=src/chicago_rstrips --cov-report=term-missing
 
           
   lint:
