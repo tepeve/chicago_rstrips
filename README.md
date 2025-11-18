@@ -174,6 +174,9 @@ El pipeline construye y puebla una base de datos PostgreSQL con los siguientes s
 *   `fact_tables`: Contiene las tablas de hechos que registran los eventos de negocio.
 *   `data_marts`: Contiene vistas materializadas para análisis.
 
+### Zoom-in a cómo se vinculal las de hechos trips, traffic y weather:
+
+
 ```mermaid
 erDiagram
     direction TB
@@ -277,17 +280,17 @@ A continuación se detallan los scripts más importantes del paquete `src/chicag
 #### `create_location_static_features.py`
 *   **Overview:** Enriquece los datos de ubicaciones (pickup/dropoff) asignándoles el área comunitaria (community area) a la que pertenecen mediante un join espacial.
 *   **Lógica:**
-    1.  Carga el archivo de límites geoespaciales de las community areas de Chicago.
-    2.  Carga el DataFrame de las ubicaciones de viajes.
-    3.  Convierte ambos DataFrames a GeoDataFrames de GeoPandas, asegurando que usen el mismo sistema de coordenadas (CRS).
-    4.  Realiza un `spatial join` para determinar a qué community area pertenece cada punto de ubicación.
-    5.  Guarda el DataFrame de ubicaciones enriquecido como un archivo Parquet en la carpeta `features/geospatial`.
+    1.  Carga el archivo de polígonos con los límites de la Ciudad de Chicago.
+    2.  Definimos a mano cuatro ubicaciones de la Ciudad, según su cercanía al Lago Michigan y su latitud Norte-Sur que utilizaremos como estaciones meteorológicas.
+    3.  Tomamos esas ubicaciones como centroides para trazar un diagrama de Voronoi, que telesa en cuatro areas el plano de la Ciudad.
+    5.  Guardamos los DataFrames de ubicaciones como un archivo Parquet en la carpeta `features/geospatial`.
 
 #### `db_loader.py`
 *   **Overview:** Proporciona utilidades para interactuar con la base de datos PostgreSQL.
 *   **Lógica:**
     *   `get_engine()`: Crea y devuelve un motor de SQLAlchemy para conectarse a la base de datos usando las credenciales del archivo `.env`.
     *   `run_ddl(ddl_path)`: Lee un archivo `.sql` y lo ejecuta en la base de datos. Se usa para crear tablas y schemas.
+    *   `load_dataframe_to_postgres(...)`: Carga un DataFrame en una tabla de PostgreSQL. Si el modo es `append`, inspecciona la tabla de destino y carga solo las columnas que coinciden para evitar errores. Si es `replace`, elimina y vuelve a crear la tabla.    
     *   `load_parquet_to_postgres(...)`: Lee un archivo Parquet y lo carga en una tabla específica de PostgreSQL, gestionando la creación de la tabla si es necesario.
 
 #### `upsert_fact_tables.sql`
@@ -319,14 +322,13 @@ open htmlcov/index.html
 Los tests se ejecutan automáticamente en GitHub Actions en cada push y pull request.
 
 
-
 ## 🔗 Enlaces Útiles
 
-*   **Dataset de Viajes (TNP):**
+*   **Dataset de Viajes (TNP) de la Ciudad de Chicago:**
     *   [Portal de Datos Abiertos](https://data.cityofchicago.org/Transportation/Transportation-Network-Providers-Trips-2025-/6dvr-xwnh/about_data)
     *   [Documentación de la API](https://dev.socrata.com/foundry/data.cityofchicago.org/6dvr-xwnh)
     *   [Manual de Reporte de TNP](https://chicago.github.io/tnp-reporting-manual/)
-*   **Dataset de Tráfico:**
+*   **Dataset de Tráfico de la Ciudad de Chicago:**
     *   [Documentación de la API](https://dev.socrata.com/foundry/data.cityofchicago.org/kf7e-cur8)
 *   **API de Clima (Visual Crossing):**
     *   [Documentación de la API](https://www.visualcrossing.com/resources/documentation/weather-api/timeline-weather-api/)
