@@ -174,7 +174,7 @@ El pipeline construye y puebla una base de datos PostgreSQL con los siguientes s
 *   `fact_tables`: Contiene las tablas de hechos que registran los eventos de negocio.
 *   `data_marts`: Contiene vistas materializadas para análisis.
 
-### Zoom-in a cómo se vinculal las de hechos trips, traffic y weather:
+### Zoom-in a cómo se vinculan las facts tables de trips, traffic y weather:
 
 ```mermaid
 erDiagram
