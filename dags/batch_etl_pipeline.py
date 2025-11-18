@@ -213,10 +213,10 @@ def etl_pipeline():
                             (location_id, longitude, latitude, source_type, batch_id, original_text)
                         VALUES (:location_id, :longitude, :latitude, :source_type, :batch_id, :original_text)
                         ON CONFLICT (location_id) DO UPDATE SET
-                            longitude = EXCLUDED.longitude,
-                            latitude = EXCLUDED.latitude,
-                            source_type = EXCLUDED.source_type,
-                            batch_id = EXCLUDED.batch_id;
+                            longitude = COALESCE(EXCLUDED.longitude, dim_spatial.trips_locations.longitude),
+                            latitude = COALESCE(EXCLUDED.latitude, dim_spatial.trips_locations.latitude),
+                            source_type = COALESCE(EXCLUDED.source_type, dim_spatial.trips_locations.source_type),
+                            batch_id = COALESCE(EXCLUDED.batch_id, dim_spatial.trips_locations.batch_id);
                     """), row.to_dict())
         finally:
             engine.dispose()
@@ -251,9 +251,9 @@ def etl_pipeline():
                             (region_id, region, west, east, south, north, geometry_wkt, area_km2, batch_id, crs)
                         VALUES (:region_id, :region, :west, :east, :south, :north, :geometry_wkt, :area_km2, :batch_id, :crs)
                         ON CONFLICT (region_id) DO UPDATE SET
-                            region = EXCLUDED.region,
-                            geometry_wkt = EXCLUDED.geometry_wkt,
-                            batch_id = EXCLUDED.batch_id;
+                            region = COALESCE(EXCLUDED.region, dim_spatial.traffic_regions.region),
+                            geometry_wkt = COALESCE(EXCLUDED.geometry_wkt, dim_spatial.traffic_regions.geometry_wkt),
+                            batch_id = COALESCE(EXCLUDED.batch_id, dim_spatial.traffic_regions.batch_id);
                     """), row.to_dict())
         finally:
             engine.dispose()
@@ -290,6 +290,23 @@ def etl_pipeline():
     # ============================================================
 
     @task
+    def join_spatial_dims():
+        """
+        Ejecuta el join espacial para mapear cada location_id a su 
+        region_id de tráfico y station_id de clima.
+        """
+        from chicago_rstrips.join_spatial_dims import join_spatial_dims
+        print("Mapeando dimensiones espaciales (locations -> traffic/weather)...")
+        join_spatial_dims()
+        print("✓ Mapeo espacial completado.")
+
+    @task
+    def find_invalid_locations():
+        from chicago_rstrips.exclude_invalid_locations import find_and_save_invalid_locations
+        print("Buscando y guardando ubicaciones inválidas...")
+        find_and_save_invalid_locations()
+
+    @task
     def populate_daily_facts(**context):
         """
         Ejecuta el UPSERT desde Staging a Fact Tables para el día procesado.
@@ -317,31 +334,34 @@ def etl_pipeline():
             engine.dispose()
         print("✓ Fact Tables actualizadas exitosamente.")
 
-    # @task
-    # def refresh_datamarts():
-    #     """
-    #     Actualiza las Vistas Materializadas para reflejar los nuevos datos.
-    #     """
-    #     from chicago_rstrips.db_loader import get_engine, run_ddl
+    @task
+    def refresh_datamarts():
+        """
+        Actualiza las Vistas Materializadas para reflejar los nuevos datos.
+        """
+        from chicago_rstrips.db_loader import get_engine, run_ddl
         
-    #     print("📊 Actualizando Datamarts (REFRESH MATERIALIZED VIEW)...")
-    #     engine = get_engine()
-    #     try:
-    #         # Usamos execution_options con AUTOCOMMIT para poder ejecutar REFRESH CONCURRENTLY
-    #         with engine.execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
-    #             print("Refrescando dm_trips_hourly_pickup_stats...")
-    #             conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_trips_hourly_pickup_stats;"))
+        print("📊 Actualizando Datamarts (REFRESH MATERIALIZED VIEW)...")
+        engine = get_engine()
+        try:
+            # Usamos execution_options con AUTOCOMMIT para poder ejecutar REFRESH CONCURRENTLY
+            with engine.execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
+                print("Refrescando fact_trips_with_traffic_weather...")
+                conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY datamarts.fact_trips_with_traffic_weather;"))
+
+                print("Refrescando dm_trips_hourly_pickup_stats...")
+                conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY datamarts.dm_trips_hourly_pickup_stats;"))
                 
-    #             print("Refrescando dm_ml_features_wide...")
-    #             conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_ml_features_wide;"))
-    #     except Exception as e:
-    #         print(f"Advertencia: {e}")
-    #         print("Intentando regenerar vistas por si no existen...")
-    #         # Si falla el refresh, ejecutamos el DDL de creación (Idempotencia)
-    #         run_ddl(engine, "create_data_marts.sql")
-    #     finally:
-    #         engine.dispose()
-    #     print("✓ Datamarts listos para consumo.")
+                print("Refrescando ml_base_table...")
+                conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY datamarts.ml_base_table;"))
+        except Exception as e:
+            print(f"Advertencia: {e}")
+            print("Intentando regenerar vistas por si no existen...")
+            # Si falla el refresh, ejecutamos el DDL de creación (Idempotencia)
+            run_ddl(engine, "create_data_marts.sql")
+        finally:
+            engine.dispose()
+        print("✓ Datamarts listos para consumo.")
 
     @task
     def generate_report(verification_result: dict, **context):
@@ -383,14 +403,22 @@ def etl_pipeline():
     [trips_paths, traffic_paths, weather_paths] >> all_paths
     all_loads_done >> staging_verified
 
+    join_dims_op = join_spatial_dims()
+    staging_verified >> join_dims_op
+
+    invalid_locations = find_invalid_locations()
+    staging_verified >> invalid_locations
+
     # 4. Transformación (Solo si Staging se verificó)
     facts_populated = populate_daily_facts()
-    # marts_refreshed = refresh_datamarts()
+    marts_refreshed = refresh_datamarts()
 
-    staging_verified >> facts_populated # >> marts_refreshed
+    [join_dims_op, invalid_locations] >> facts_populated
+
+    facts_populated >> marts_refreshed
 
     # Reporte Final
-    # marts_refreshed >> generate_report(staging_verified)
-    facts_populated >> generate_report(staging_verified)
+    marts_refreshed >> generate_report(staging_verified)
+    
 
 etl_pipeline()

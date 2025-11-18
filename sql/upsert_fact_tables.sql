@@ -27,6 +27,23 @@ WHERE
     -- FILTRO INCREMENTAL: Solo registros de esta ejecución
     trip_start_timestamp >= :start_date 
     AND trip_start_timestamp < :end_date
+    -- FILTRO DE CALIDAD: Evita datos inválidos
+    AND fare IS NOT NULL
+    AND fare > 0
+    AND trip_seconds > 60  -- Al menos 1 minuto
+    AND pickup_location_id IS NOT NULL
+    AND dropoff_location_id IS NOT NULL
+    -- FILTRO DE GEOLOCALIZACIÓN: Excluye ubicaciones inválidas
+    AND NOT EXISTS (
+        SELECT il.location_id
+        FROM dim_spatial.invalid_locations il
+        WHERE il.location_id = staging.stg_raw_trips.pickup_location_id
+    )
+    AND NOT EXISTS (
+        SELECT il.location_id
+        FROM dim_spatial.invalid_locations il
+        WHERE il.location_id = staging.stg_raw_trips.dropoff_location_id
+    )
 ON CONFLICT (trip_id) DO UPDATE SET
     trip_start_timestamp = EXCLUDED.trip_start_timestamp,
     trip_end_timestamp = EXCLUDED.trip_end_timestamp,

@@ -57,7 +57,7 @@ El proyecto está contenedorizado con Docker y utiliza Docker Compose para orque
     ```
 
 4.  **Acceder a la UI de Airflow:**
-    Abre tu navegador y ve a `http://localhost:8080`. El usuario y contraseña por defecto son `airflow`.
+    Abre tu navegador y ve a `http://localhost:8080`. El usuario y contraseña por defecto son `admin`.
 
 5.  **Ejecutar los DAGs:**
     *   **Cold Start:** Primero, activa y ejecuta manualmente el DAG `coldstart_etl_pipeline`. Este proceso inicializa la base de datos, carga todas las tablas y realiza unaprimera ingesta de datos históricos.
@@ -171,6 +171,7 @@ El pipeline construye y puebla una base de datos PostgreSQL con los siguientes s
 *   `data_marts`: Contiene vistas materializadas para análisis.
 
 ### Zoom-in a cómo se vinculan las facts tables de trips, traffic y weather:
+Este modelo se aplica el script `join_spatial_dims.py` y se materializa en la tabla `dim_spatial.mapped_locations`.
 
 ```mermaid
 erDiagram

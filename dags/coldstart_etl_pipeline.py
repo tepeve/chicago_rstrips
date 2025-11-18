@@ -251,6 +251,23 @@ def coldstart_etl_pipeline():
 # ============================================================
 
     @task
+    def join_spatial_dims():
+        """
+        Ejecuta el join espacial para mapear cada location_id a su 
+        region_id de tráfico y station_id de clima.
+        """
+        from chicago_rstrips.join_spatial_dims import join_spatial_dims
+        print("Mapeando dimensiones espaciales (locations -> traffic/weather)...")
+        join_spatial_dims()
+        print("✓ Mapeo espacial completado.")
+
+    @task
+    def find_invalid_locations():
+        from chicago_rstrips.exclude_invalid_locations import find_and_save_invalid_locations
+        print("Buscando y guardando ubicaciones inválidas...")
+        find_and_save_invalid_locations()
+
+    @task
     def populate_initial_facts():
         """
         Ejecuta upsert_fact_tables.sql para todo el rango histórico.
@@ -277,30 +294,30 @@ def coldstart_etl_pipeline():
             engine.dispose()
         print("✓ Fact Tables inicializadas con datos históricos.")
 
-    # @task
-    # def create_and_refresh_datamarts():
-    #     """
-    #     Asegura que las vistas existan y las refresca con la data recién cargada.
-    #     """
-    #     from chicago_rstrips.db_loader import get_engine, run_ddl
-    #     print("Construyendo y Refrescando Datamarts...")
+    @task
+    def create_and_refresh_datamarts():
+        """
+        Asegura que las vistas existan y las refresca con la data recién cargada.
+        """
+        from chicago_rstrips.db_loader import get_engine, run_ddl
+        print("Construyendo y Refrescando Datamarts...")
         
-    #     engine = get_engine()
-    #     try:            
-    #         # 1. (Opcional pero recomendado) Re-ejecutar DDL por si hubo cambios
-    #         run_ddl(engine, "create_data_marts.sql")
+        engine = get_engine()
+        try:            
+            # 1. (Opcional pero recomendado) Re-ejecutar DDL por si hubo cambios
+            run_ddl(engine, "create_data_marts.sql")
 
-    #         # 2. Refrescar datos (Materialized Views)
-    #         with engine.execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
-    #             print("Refrescando dm_trips_hourly_pickup_stats...")
-    #             conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_trips_hourly_pickup_stats;"))
+            # 2. Refrescar datos (Materialized Views)
+            with engine.execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
+                print("Refrescando dm_trips_hourly_pickup_stats...")
+                conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY datamarts.dm_trips_hourly_pickup_stats;"))
                 
-    #             print("Refrescando dm_ml_features_wide (puede tardar)...")
-    #             conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_ml_features_wide;"))
+                print("Refrescando ml_base_table (puede tardar)...")
+                conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY datamarts.ml_base_table;"))
                 
-    #     finally:
-    #         engine.dispose()
-    #     print("✓ Datamarts listos y operativos.")
+        finally:
+            engine.dispose()
+        print("✓ Datamarts listos y operativos.")
 
     # --- TAREA QUE FALTABA ---
     @task
@@ -358,11 +375,19 @@ def coldstart_etl_pipeline():
     # La verificación espera a que todas las cargas terminen
     [trips_loaded, locations_loaded, traffic_loaded, regions_loaded, weather_loaded] >> verification
 
+    # creamos la tabla de claves para unir ubicacions de trips, traffic y weather
+    join_dims_op = join_spatial_dims()
+    verification >> join_dims_op
+
     # Si la verificación pasa, poblamos facts y luego datamarts
+    invalid_locations = find_invalid_locations()
+
     populate_facts_op = populate_initial_facts()
-    # create_marts_op = create_and_refresh_datamarts()
+    create_marts_op = create_and_refresh_datamarts()
     report_op = generate_report(verification)
 
-    verification >> populate_facts_op >>  report_op # create_marts_op >> report_op
+    [join_dims_op, invalid_locations] >> populate_facts_op
+
+    populate_facts_op >>  create_marts_op >> report_op
 
 coldstart_etl_pipeline()
