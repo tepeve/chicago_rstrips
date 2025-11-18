@@ -74,32 +74,76 @@ El sistema se basa en dos DAGs de Airflow principales que orquestan todo el fluj
 ### Diagrama de Flujo de los DAGs
 
 ```mermaid
-graph LR
-    subgraph coldstart_etl_pipeline
-        A[setup_ddl: Crear Schemas y Tablas] --> B(generate_static_features: City, Stations, Voronoi);
-        B --> C(load_static_features: Cargar a dim_spatial);
-        A --> D(extract_historical_data: Trips, Traffic, Weather);
-        C --> D;
-        D --> E(load_to_staging: Cargar Parquets a Staging);
-        E --> F(verify_staging_load);
-        F --> G(populate_initial_facts: Upsert masivo a Fact Tables);
-        G --> H(create_and_refresh_datamarts: Crear y refrescar Vistas Materializadas);
-        H --> I(generate_report);
-    end
+---
+config:
+  layout: dagre
+---
+flowchart LR
+ subgraph Setup["Configuración Inicial"]
+    direction TB
+        DDL["setup_ddl<br>Crear Schemas y Tablas"]
+  end
+ subgraph Static["Datos Estáticos y Espaciales"]
+    direction TB
+        GEN_STATIC("generate_static_features<br>City, Stations, Voronoi")
+        LOAD_STATIC[("load_static_features<br>Dim Spatial Tables")]
+        LOAD_REGIONS[("load_regions<br>")]
+        LOAD_LOCS[("load_locations<br>Staging DB")]
+  end
+ subgraph Ingestion["Extracción de datos"]
+    direction TB
+        EXT_TRIPS("extract_trips<br>by API SOCRATA")
+        EXT_TRAFFIC("extract_traffic<br>by API SOCRATA")
+        EXT_WEATHER("extract_weather<br>by Visual Crossing API")
+  end
+ subgraph Staging["Carga a Staging"]
+        LOAD_TRIPS[("load_trips<br>Staging DB")]
+        LOAD_TRAFFIC[("load_traffic<br>Staging DB")]
+        LOAD_WEATHER[("load_weather<br>Staging DB")]
+  end
+ subgraph Facts["Capa de Hechos y Datamarts"]
+        FACT_TRIPS[("fact_trips<br>Staging DB")]
+        FACT_TRAFFIC[("fact_traffic<br>Staging DB")]
+        FACT_WEATHER[("fact_weather<br>Staging DB")]
+  end
+    DDL --> GEN_STATIC & EXT_TRIPS & EXT_TRAFFIC & EXT_WEATHER
+    GEN_STATIC --> LOAD_STATIC
+    EXT_TRIPS --> LOAD_TRIPS
+    EXT_TRIPS -.-> LOAD_LOCS
+    EXT_TRAFFIC --> LOAD_TRAFFIC
+    EXT_TRAFFIC -.-> LOAD_REGIONS
+    EXT_WEATHER --> LOAD_WEATHER
+    LOAD_TRIPS --> VERIFY{"Data Depuration<br>populate_initial_facts"}
+    LOAD_TRAFFIC --> VERIFY
+    LOAD_WEATHER --> VERIFY
+    VERIFY --> FACT_TRIPS & FACT_TRAFFIC & FACT_WEATHER
+    LOAD_STATIC --> EXT_WEATHER
+     DDL:::setup
+     GEN_STATIC:::extract
+     LOAD_STATIC:::db
+     LOAD_REGIONS:::db
+     LOAD_LOCS:::db
+     EXT_TRIPS:::extract
+     EXT_TRAFFIC:::extract
+     EXT_WEATHER:::extract
+     LOAD_TRIPS:::db
+     LOAD_TRAFFIC:::db
+     LOAD_WEATHER:::db
+     FACT_TRIPS:::db
+     FACT_TRAFFIC:::db
+     FACT_WEATHER:::db
+     VERIFY:::check
+    classDef setup fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef extract fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef db fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef transform fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef check fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 5 5
+    style Static stroke:none
+    style Setup stroke:none
+    style Ingestion stroke:none
+    style Staging stroke:none
+    style Facts stroke:none
 
-    subgraph batch_etl_pipeline
-        J(wait_for_coldstart: ExternalTaskSensor) --> K(extract_daily_data: Trips, Traffic, Weather);
-        K --> L(load_to_staging_append);
-        L --> M(verify_staging_load);
-        M --> N(populate_daily_facts: Upsert incremental);
-        N --> O(refresh_datamarts);
-        O --> P(generate_report);
-    end
-
-    ColdStartSuccess([Cold Start Exitoso])
-    style ColdStartSuccess fill:#d4edda,stroke:#c3e6cb
-    I --> ColdStartSuccess;
-    ColdStartSuccess --> J;
 ```
 
 ### Componentes del Pipeline
@@ -132,7 +176,8 @@ El pipeline construye y puebla una base de datos PostgreSQL con los siguientes s
 
 ```mermaid
 erDiagram
-    fact_tables.fact_trips {
+    direction TB
+    fact_tables_fact_trips["fact_tables.fact_trips"] {
         varchar trip_id PK
         timestamp trip_start_timestamp
         timestamp trip_end_timestamp
@@ -144,7 +189,7 @@ erDiagram
         varchar batch_id
     }
 
-    fact_tables.fact_traffic {
+    fact_tables_fact_traffic["fact_tables.fact_traffic"] {
         varchar record_id PK
         timestamp time
         integer region_id FK
@@ -152,7 +197,7 @@ erDiagram
         varchar batch_id
     }
 
-    fact_tables.fact_weather {
+    fact_tables_fact_weather["fact_tables.fact_weather"] {
         varchar record_id PK
         timestamp datetime
         varchar station_id FK
@@ -161,37 +206,42 @@ erDiagram
         varchar batch_id
     }
 
-    dim_spatial.trips_locations {
+    dim_spatial_trips_locations["dim_spatial.trips_locations"] {
         varchar location_id PK
         float longitude
         float latitude
         varchar original_text
     }
 
-    dim_spatial.traffic_regions {
+    dim_spatial_traffic_regions["dim_spatial.traffic_regions"] {
         integer region_id PK
         varchar region
         varchar geometry_wkt
     }
 
-    dim_spatial.dim_weather_stations {
+    dim_spatial_dim_weather_stations["dim_spatial.dim_weather_stations"] {
         varchar station_id PK
         varchar station_name
         float latitude
         float longitude
     }
 
-    dim_spatial.dim_weather_voronoi_zones {
+    dim_spatial_dim_weather_voronoi_zones["dim_spatial.dim_weather_voronoi_zones"] {
         integer zone_id PK
         varchar station_id FK
         varchar geometry_wkt
     }
 
-    fact_tables.fact_trips }o--|| dim_spatial.trips_locations : "pickup"
-    fact_tables.fact_trips }o--|| dim_spatial.trips_locations : "dropoff"
-    fact_tables.fact_traffic }o--|| dim_spatial.traffic_regions : "located in"
-    fact_tables.fact_weather }o--|| dim_spatial.dim_weather_stations : "measured at"
-    dim_spatial.dim_weather_voronoi_zones }o--|| dim_spatial.dim_weather_stations : "generated from"
+    %% Relaciones FK existentes
+    fact_tables_fact_trips }o--|| dim_spatial_trips_locations : "pickup"
+    fact_tables_fact_trips }o--|| dim_spatial_trips_locations : "dropoff"
+    fact_tables_fact_traffic }o--|| dim_spatial_traffic_regions : "located in"
+    fact_tables_fact_weather }o--|| dim_spatial_dim_weather_stations : "measured at"
+    dim_spatial_dim_weather_voronoi_zones }o--|| dim_spatial_dim_weather_stations : "generated from"
+
+    %% NUEVAS Relaciones Espaciales (Point in Polygon)
+    dim_spatial_traffic_regions ||--o{ dim_spatial_trips_locations : "spatial join (contains)"
+    dim_spatial_dim_weather_voronoi_zones ||--o{ dim_spatial_trips_locations : "spatial join (contains)"
 
 ```
 

@@ -50,7 +50,7 @@ def coldstart_etl_pipeline():
             run_ddl(engine, "create_dim_dynamic_tables.sql")
             run_ddl(engine, "create_fact_tables.sql")
             # Creamos las vistas vacías inicialmente
-            run_ddl(engine, "create_data_marts.sql")            
+            # run_ddl(engine, "create_data_marts.sql")            
         finally:
             engine.dispose()
         print("✓ DDLs ejecutados.")
@@ -277,30 +277,30 @@ def coldstart_etl_pipeline():
             engine.dispose()
         print("✓ Fact Tables inicializadas con datos históricos.")
 
-    @task
-    def create_and_refresh_datamarts():
-        """
-        Asegura que las vistas existan y las refresca con la data recién cargada.
-        """
-        from chicago_rstrips.db_loader import get_engine, run_ddl
-        print("Construyendo y Refrescando Datamarts...")
+    # @task
+    # def create_and_refresh_datamarts():
+    #     """
+    #     Asegura que las vistas existan y las refresca con la data recién cargada.
+    #     """
+    #     from chicago_rstrips.db_loader import get_engine, run_ddl
+    #     print("Construyendo y Refrescando Datamarts...")
         
-        engine = get_engine()
-        try:            
-            # 1. (Opcional pero recomendado) Re-ejecutar DDL por si hubo cambios
-            run_ddl(engine, "create_data_marts.sql")
+    #     engine = get_engine()
+    #     try:            
+    #         # 1. (Opcional pero recomendado) Re-ejecutar DDL por si hubo cambios
+    #         run_ddl(engine, "create_data_marts.sql")
 
-            # 2. Refrescar datos (Materialized Views)
-            with engine.execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
-                print("Refrescando dm_trips_hourly_pickup_stats...")
-                conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_trips_hourly_pickup_stats;"))
+    #         # 2. Refrescar datos (Materialized Views)
+    #         with engine.execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
+    #             print("Refrescando dm_trips_hourly_pickup_stats...")
+    #             conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_trips_hourly_pickup_stats;"))
                 
-                print("Refrescando dm_ml_features_wide (puede tardar)...")
-                conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_ml_features_wide;"))
+    #             print("Refrescando dm_ml_features_wide (puede tardar)...")
+    #             conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_ml_features_wide;"))
                 
-        finally:
-            engine.dispose()
-        print("✓ Datamarts listos y operativos.")
+    #     finally:
+    #         engine.dispose()
+    #     print("✓ Datamarts listos y operativos.")
 
     # --- TAREA QUE FALTABA ---
     @task
@@ -360,9 +360,9 @@ def coldstart_etl_pipeline():
 
     # Si la verificación pasa, poblamos facts y luego datamarts
     populate_facts_op = populate_initial_facts()
-    create_marts_op = create_and_refresh_datamarts()
+    # create_marts_op = create_and_refresh_datamarts()
     report_op = generate_report(verification)
 
-    verification >> populate_facts_op >> create_marts_op >> report_op
+    verification >> populate_facts_op >>  report_op # create_marts_op >> report_op
 
 coldstart_etl_pipeline()

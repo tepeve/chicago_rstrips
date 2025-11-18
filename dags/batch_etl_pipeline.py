@@ -317,31 +317,31 @@ def etl_pipeline():
             engine.dispose()
         print("✓ Fact Tables actualizadas exitosamente.")
 
-    @task
-    def refresh_datamarts():
-        """
-        Actualiza las Vistas Materializadas para reflejar los nuevos datos.
-        """
-        from chicago_rstrips.db_loader import get_engine, run_ddl
+    # @task
+    # def refresh_datamarts():
+    #     """
+    #     Actualiza las Vistas Materializadas para reflejar los nuevos datos.
+    #     """
+    #     from chicago_rstrips.db_loader import get_engine, run_ddl
         
-        print("📊 Actualizando Datamarts (REFRESH MATERIALIZED VIEW)...")
-        engine = get_engine()
-        try:
-            # Usamos execution_options con AUTOCOMMIT para poder ejecutar REFRESH CONCURRENTLY
-            with engine.execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
-                print("Refrescando dm_trips_hourly_pickup_stats...")
-                conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_trips_hourly_pickup_stats;"))
+    #     print("📊 Actualizando Datamarts (REFRESH MATERIALIZED VIEW)...")
+    #     engine = get_engine()
+    #     try:
+    #         # Usamos execution_options con AUTOCOMMIT para poder ejecutar REFRESH CONCURRENTLY
+    #         with engine.execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
+    #             print("Refrescando dm_trips_hourly_pickup_stats...")
+    #             conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_trips_hourly_pickup_stats;"))
                 
-                print("Refrescando dm_ml_features_wide...")
-                conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_ml_features_wide;"))
-        except Exception as e:
-            print(f"Advertencia: {e}")
-            print("Intentando regenerar vistas por si no existen...")
-            # Si falla el refresh, ejecutamos el DDL de creación (Idempotencia)
-            run_ddl(engine, "create_data_marts.sql")
-        finally:
-            engine.dispose()
-        print("✓ Datamarts listos para consumo.")
+    #             print("Refrescando dm_ml_features_wide...")
+    #             conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY dm_ml_features_wide;"))
+    #     except Exception as e:
+    #         print(f"Advertencia: {e}")
+    #         print("Intentando regenerar vistas por si no existen...")
+    #         # Si falla el refresh, ejecutamos el DDL de creación (Idempotencia)
+    #         run_ddl(engine, "create_data_marts.sql")
+    #     finally:
+    #         engine.dispose()
+    #     print("✓ Datamarts listos para consumo.")
 
     @task
     def generate_report(verification_result: dict, **context):
@@ -385,11 +385,12 @@ def etl_pipeline():
 
     # 4. Transformación (Solo si Staging se verificó)
     facts_populated = populate_daily_facts()
-    marts_refreshed = refresh_datamarts()
+    # marts_refreshed = refresh_datamarts()
 
-    staging_verified >> facts_populated >> marts_refreshed
+    staging_verified >> facts_populated # >> marts_refreshed
 
     # Reporte Final
-    marts_refreshed >> generate_report(staging_verified)
+    # marts_refreshed >> generate_report(staging_verified)
+    facts_populated >> generate_report(staging_verified)
 
 etl_pipeline()
