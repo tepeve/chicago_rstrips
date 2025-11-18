@@ -85,6 +85,7 @@ flowchart LR
         LOAD_STATIC[("load_static_features<br>Dim Spatial Tables")]
         LOAD_REGIONS[("load_regions<br>")]
         LOAD_LOCS[("load_locations<br>Staging DB")]
+        MAP_LOCS{{"locations_mapped"}}
   end
  subgraph Ingestion["Extracción de datos"]
     direction TB
@@ -101,6 +102,7 @@ flowchart LR
         FACT_TRIPS[("fact_trips<br>Staging DB")]
         FACT_TRAFFIC[("fact_traffic<br>Staging DB")]
         FACT_WEATHER[("fact_weather<br>Staging DB")]
+        ML_TABLE{{"ml_base_table"}}
   end
     DDL --> GEN_STATIC & EXT_TRIPS & EXT_TRAFFIC & EXT_WEATHER
     GEN_STATIC --> LOAD_STATIC
@@ -113,12 +115,21 @@ flowchart LR
     LOAD_TRAFFIC --> VERIFY
     LOAD_WEATHER --> VERIFY
     VERIFY --> FACT_TRIPS & FACT_TRAFFIC & FACT_WEATHER
+    FACT_TRIPS --> ML_TABLE
+    FACT_TRAFFIC --> ML_TABLE
+    FACT_WEATHER --> ML_TABLE
     LOAD_STATIC --> EXT_WEATHER
+    LOAD_STATIC -.-> MAP_LOCS
+    LOAD_LOCS -.-> MAP_LOCS
+    LOAD_REGIONS -.-> MAP_LOCS
+    MAP_LOCS -.-> ML_TABLE
+
      DDL:::setup
      GEN_STATIC:::extract
      LOAD_STATIC:::db
      LOAD_REGIONS:::db
      LOAD_LOCS:::db
+     MAP_LOCS:::setup
      EXT_TRIPS:::extract
      EXT_TRAFFIC:::extract
      EXT_WEATHER:::extract
@@ -128,18 +139,18 @@ flowchart LR
      FACT_TRIPS:::db
      FACT_TRAFFIC:::db
      FACT_WEATHER:::db
+     ML_TABLE:::setup
      VERIFY:::check
     classDef setup fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef transform fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     classDef extract fill:#fff3e0,stroke:#e65100,stroke-width:2px
     classDef db fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    classDef transform fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     classDef check fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 5 5
     style Static stroke:none
     style Setup stroke:none
     style Ingestion stroke:none
     style Staging stroke:none
     style Facts stroke:none
-
 ```
 
 ### Componentes del Pipeline
@@ -289,6 +300,13 @@ A continuación se detallan los scripts más importantes del paquete `src/chicag
     *   `load_dataframe_to_postgres(...)`: Carga un DataFrame en una tabla de PostgreSQL. Si el modo es `append`, inspecciona la tabla de destino y carga solo las columnas que coinciden para evitar errores. Si es `replace`, elimina y vuelve a crear la tabla.    
     *   `load_parquet_to_postgres(...)`: Lee un archivo Parquet y lo carga en una tabla específica de PostgreSQL, gestionando la creación de la tabla si es necesario.
 
+#### `join_spatial_dims.py`
+*   **Overview:** Crea una tabla de mapeo (`dim_spatial.mapped_locations`) que vincula cada ubicación de viaje con su región de tráfico y zona meteorológica correspondiente.
+*   **Lógica:**
+    1.  Obtiene las ubicaciones de los viajes, los polígonos de las regiones de tráfico y las zonas de Voronoi de las estaciones meteorológicas desde la base de datos.
+    2.  Realiza uniones espaciales (`spatial join`) para determinar qué región de tráfico y qué zona de Voronoi contiene cada punto de ubicación de viaje.
+    3.  Guarda el resultado (un mapeo de `location_id` a `region_id` y `station_id`) en la tabla `dim_spatial.mapped_locations`.
+
 #### `upsert_fact_tables.sql`
 *   **Overview:** Transfiere y transforma datos desde las tablas de `staging` a las tablas de hechos (`fact_tables`).
 *   **Lógica:**
@@ -296,6 +314,13 @@ A continuación se detallan los scripts más importantes del paquete `src/chicag
     2.  Aplica una cláusula `ON CONFLICT (trip_id) DO UPDATE` para manejar registros duplicados, actualizando los existentes (UPSERT).
     3.  Realiza el mismo proceso para las tablas de tráfico y clima.
     4.  Filtra los registros a procesar según la ventana de tiempo de ejecución del DAG.
+
+#### `create_data_marts.sql`
+*   **Overview:** Crea vistas materializadas que integran las tablas tablas de hechos (`fact_tables`) para análisis futuros.
+*   **Lógica:**
+    1.  Crea la vista materializada `dm_trips_hourly_pickup_stats` que agrega los viajes por hora y área de recogida para obtener estadísticas.
+    2.  Crea la vista materializada `fact_trips_with_traffic_weather` que enriquece cada viaje con los datos de tráfico y clima más cercanos en el tiempo.
+    3.  Crea una tabla base (`ml_base_table`) que integra las vistas anteriores y calcula características adicionales (features) usando funciones de ventana.
 
 ## 🧪 Testing
 
