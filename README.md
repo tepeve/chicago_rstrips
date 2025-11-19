@@ -51,15 +51,13 @@ El proyecto está contenedorizado con Docker y utiliza Docker Compose para orque
     # Configuración del webserver de airflow
     AIRFLOW__WEBSERVER__SECRET_KEY=
     ```
-    > **Nota:** Las credenciales de la base de datos deben coincidir con las definidas en `docker-compose.yml` para que Airflow pueda conectarse. 
-    
-    Podés generar una AIRFLOW__WEBSERVER__SECRET_KEY propio corriendo el siguiente bash y guardándolo en el .env. 
+    > **Nota:** Las credenciales de la base de datos deben coincidir con las definidas en `docker-compose.yml` para que Airflow pueda conectarse. Podés generar tu `AIRFLOW__WEBSERVER__SECRET_KEY` propia corriendo la siguiente línea y guardando su resultado en el .env. 
     ```bash
     openssl rand -hex 32
     ```
 
 3.  **Desplegar el proyecto:**
-    Con este comando podés construir las imágenes y levantará todos los servicios (Airflow, Postgres, etc.) en una línea. 
+    Con este comando podés construir las imágenes y levantar todos los servicios (Airflow, Postgres, etc.) en una línea. 
 
     ```bash
     make run-project
@@ -68,15 +66,15 @@ El proyecto está contenedorizado con Docker y utiliza Docker Compose para orque
 4.  **Acceder a la UI de Airflow:**
     Abrí tu navegador y andá a `http://localhost:8080`. El usuario y contraseña por defecto son `admin`.
 
-5.  **Cómo ejecutar los DAGs:**
+5.  ⚠️**Cómo ejecutar los DAGs:**
     *   **Cold Start:** Primero, activá y ejecutá manualmente el DAG `coldstart_etl_pipeline`. Este proceso inicializa la base de datos, carga todas las tablas y realiza unaprimera ingesta de datos históricos.
     *   **Batch Incremental:** Una vez que el `coldstart_etl_pipeline` haya finalizado con éxito, activá el DAG `batch_etl_pipeline`. Este se ejecutará diariamente (`@daily`) para procesar los nuevos datos de forma incremental.
 
 ## 🧬 Arquitectura y Flujo de Datos
 
-El sistema se basa en dos DAGs de Airflow principales que orquestan todo el flujo ELT.
+El sistema se basa en dos DAGs de Airflow principales que orquestan todo el flujo ELT. 
 
-### Diagrama de Flujo de los DAGs
+### Diagrama de Flujo de los DAGs (ejemplo: coldstart_etl_pipeline)
 
 ```mermaid
 ---
