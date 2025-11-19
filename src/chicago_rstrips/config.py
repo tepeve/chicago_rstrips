@@ -9,7 +9,7 @@ load_dotenv()
 # Date Range for Data Extraction
 START_DATE="2025-09-01T00:00:00.000"
 COLD_START_END_DATE="2025-09-03T23:59:00.000"
-END_DATE="2025-09-06T23:59:00.000"
+END_DATE="2025-09-10T23:59:00.000"
 
 # ENDPOINT DE LA API DE TRIPS
 # https://dev.socrata.com/foundry/data.cityofchicago.org/6dvr-xwnh
@@ -36,11 +36,11 @@ if not WEATHER_API_KEY:
     raise ValueError("La variable de entorno WEATHER_API_KEY no está configurada.")
 
 # REDSHIFT CREDENTIALS
-REDSHIFT_HOST = os.getenv("REDSHIFT_HOST")
-REDSHIFT_PORT = os.getenv("REDSHIFT_PORT")
-REDSHIFT_DB = os.getenv("REDSHIFT_DB")
-REDSHIFT_PASSWORD = os.getenv("REDSHIFT_PASSWORD")
-REDSHIFT_USER = os.getenv("REDSHIFT_USER")
+# REDSHIFT_HOST = os.getenv("REDSHIFT_HOST")
+# REDSHIFT_PORT = os.getenv("REDSHIFT_PORT")
+# REDSHIFT_DB = os.getenv("REDSHIFT_DB")
+# REDSHIFT_PASSWORD = os.getenv("REDSHIFT_PASSWORD")
+# REDSHIFT_USER = os.getenv("REDSHIFT_USER")
 
 
 # Local Postgres (para desarrollo)

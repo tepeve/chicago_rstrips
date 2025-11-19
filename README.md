@@ -14,7 +14,7 @@ Los componentes principales del pipeline son:
 *   **Carga (L):** Carga los datos crudos extraídos en un área de Staging en una base de datos PostgreSQL, actuando como una capa intermedia antes de la transformación. 
 *   **Transformación (T):** Depura y modela los datos desde el área de Staging para poblar un Data Warehouse con un esquema dimensional (tablas de hechos y dimensiones), y finalmente, crea vistas materializadas (Data Marts) optimizadas para consultas analíticas y de negocio. 
 
-## 📁 Estructura del Proyecto
+## 📁 Estructura del Repositorio
 ```
 chicago_rstrips/
 ├── src/chicago_rstrips/    # Código fuente
@@ -35,7 +35,7 @@ El proyecto está contenedorizado con Docker y utiliza Docker Compose para orque
     ```
 
 2.  **Configurar Variables de Entorno:**
-    El manejo de entornos y dependencias está gestionado con uv. Crea un archivo `.env` en la raíz del proyecto. Puedes crearlo desde cero con las siguientes variables necesarias para desplegar el sistema:
+    El manejo de entornos y dependencias está gestionado con uv. Crea un archivo `.env` en la raíz del proyecto. Tambíen podés crearlo desde cero pero vas a necesitar definir estas variables para desplegar el sistema:
     ```env
     # Credenciales para las APIs
     SOCRATA_APP_TOKEN="TU_APP_TOKEN_DE_SOCRATA"
@@ -47,21 +47,30 @@ El proyecto está contenedorizado con Docker y utiliza Docker Compose para orque
     POSTGRES_LOCAL_HOST=
     POSTGRES_LOCAL_PORT=
     POSTGRES_LOCAL_DB=
-    ```
-    > **Nota:** Las credenciales de la base de datos deben coincidir con las definidas en `docker-compose.yml` para que Airflow pueda conectarse.
 
-3.  **Inicializar Airflow y Levantar los Servicios:**
-    El `entrypoint.sh` se encargará de inicializar la base de datos de Airflow.
+    # Configuración del webserver de airflow
+    AIRFLOW__WEBSERVER__SECRET_KEY=
+    ```
+    > **Nota:** Las credenciales de la base de datos deben coincidir con las definidas en `docker-compose.yml` para que Airflow pueda conectarse. 
+    
+    Podés generar una AIRFLOW__WEBSERVER__SECRET_KEY propio corriendo el siguiente bash y guardándolo en el .env. 
     ```bash
-    docker-compose up -d
+    openssl rand -hex 32
+    ```
+
+3.  **Desplegar el proyecto:**
+    Con este comando podés construir las imágenes y levantará todos los servicios (Airflow, Postgres, etc.) en una línea. 
+
+    ```bash
+    make run-project
     ```
 
 4.  **Acceder a la UI de Airflow:**
-    Abre tu navegador y ve a `http://localhost:8080`. El usuario y contraseña por defecto son `admin`.
+    Abrí tu navegador y andá a `http://localhost:8080`. El usuario y contraseña por defecto son `admin`.
 
-5.  **Ejecutar los DAGs:**
-    *   **Cold Start:** Primero, activa y ejecuta manualmente el DAG `coldstart_etl_pipeline`. Este proceso inicializa la base de datos, carga todas las tablas y realiza unaprimera ingesta de datos históricos.
-    *   **Batch Incremental:** Una vez que el `coldstart_etl_pipeline` haya finalizado con éxito, activa el DAG `batch_etl_pipeline`. Este se ejecutará diariamente (`@daily`) para procesar los nuevos datos de forma incremental.
+5.  **Cómo ejecutar los DAGs:**
+    *   **Cold Start:** Primero, activá y ejecutá manualmente el DAG `coldstart_etl_pipeline`. Este proceso inicializa la base de datos, carga todas las tablas y realiza unaprimera ingesta de datos históricos.
+    *   **Batch Incremental:** Una vez que el `coldstart_etl_pipeline` haya finalizado con éxito, activá el DAG `batch_etl_pipeline`. Este se ejecutará diariamente (`@daily`) para procesar los nuevos datos de forma incremental.
 
 ## 🧬 Arquitectura y Flujo de Datos
 
@@ -151,6 +160,7 @@ flowchart LR
     style Ingestion stroke:none
     style Staging stroke:none
     style Facts stroke:none
+
 ```
 
 ### Componentes del Pipeline
@@ -262,35 +272,35 @@ A continuación se detallan los scripts más importantes del paquete `src/chicag
 #### `extract_trips_data.py`
 *   **Overview:** Extrae datos de viajes de la API de Socrata para un rango de fechas, genera una dimensión de ubicaciones y guarda ambos como archivos Parquet.
 *   **Lógica:**
-    1.  Construye una query SoQL con el rango de fechas especificado.
-    2.  Llama a la función `fetch_data_from_api` para obtener los datos.
-    3.  Si se indica (`build_locations=True`), extrae las coordenadas de `pickup` y `dropoff`, las desduplica y crea un DataFrame de dimensión de ubicaciones con un `location_id` único.
-    4.  Mapea los `location_id` de vuelta al DataFrame de viajes.
-    5.  Guarda el DataFrame de viajes y el de ubicaciones en formato Parquet en el directorio `data/raw/`.
+    *  Construye una query SoQL con el rango de fechas especificado.
+    *  Llama a la función `fetch_data_from_api` para obtener los datos.
+    *  Si se indica (`build_locations=True`), extrae las coordenadas de `pickup` y `dropoff`, las desduplica y crea un DataFrame de dimensión de ubicaciones con un `location_id` único.
+    *  Mapea los `location_id` de vuelta al DataFrame de viajes.
+    *  Guarda el DataFrame de viajes y el de ubicaciones en formato Parquet en el directorio `data/raw/`.
 
 #### `extract_traffic_data.py`
 *   **Overview:** Extrae datos de tráfico de la API de Socrata y genera una dimensión de regiones de tráfico.
 *   **Lógica:**
-    1.  Construye una query SoQL para obtener datos de tráfico por región.
-    2.  Obtiene los datos a través de `fetch_data_from_api`.
-    3.  Si se indica (`build_regions=True`), construye un GeoDataFrame con los polígonos de cada región de tráfico.
-    4.  Guarda los datos de tráfico y la dimensión de regiones en archivos Parquet.
+    *  Construye una query SoQL para obtener datos de tráfico por región.
+    *  Obtiene los datos a través de `fetch_data_from_api`.
+    *  Si se indica (`build_regions=True`), construye un GeoDataFrame con los polígonos de cada región de tráfico.
+    *  Guarda los datos de tráfico y la dimensión de regiones en archivos Parquet.
 
 #### `extract_weather_data.py`
 *   **Overview:** Extrae datos meteorológicos por hora para un conjunto de estaciones.
 *   **Lógica:**
-    1.  Obtiene la lista de estaciones meteorológicas desde la base de datos.
-    2.  Itera sobre cada estación y llama a la API de Visual Crossing para obtener el historial climático por hora en el rango de fechas especificado.
-    3.  Combina los resultados de todas las estaciones en un único DataFrame.
-    4.  Guarda el DataFrame resultante en formato Parquet.
+    *  Obtiene la lista de estaciones meteorológicas desde la base de datos.
+    *  Itera sobre cada estación y llama a la API de Visual Crossing para obtener el historial climático por hora en el rango de fechas especificado.
+    *  Combina los resultados de todas las estaciones en un único DataFrame.
+    *  Guarda el DataFrame resultante en formato Parquet.
 
 #### `create_location_static_features.py`
 *   **Overview:** Enriquece los datos de ubicaciones (pickup/dropoff) asignándoles el área comunitaria (community area) a la que pertenecen mediante un join espacial.
 *   **Lógica:**
-    1.  Carga el archivo de polígonos con los límites de la Ciudad de Chicago.
-    2.  Definimos a mano cuatro ubicaciones de la Ciudad, según su cercanía al Lago Michigan y su latitud Norte-Sur que utilizaremos como estaciones meteorológicas.
-    3.  Tomamos esas ubicaciones como centroides para trazar un diagrama de Voronoi, que telesa en cuatro areas el plano de la Ciudad.
-    5.  Guardamos los DataFrames de ubicaciones como un archivo Parquet en la carpeta `features/geospatial`.
+    *  Carga el archivo de polígonos con los límites de la Ciudad de Chicago.
+    *  Definimos a mano cuatro ubicaciones de la Ciudad, según su cercanía al Lago Michigan y su latitud Norte-Sur que utilizaremos como estaciones meteorológicas.
+    *  Tomamos esas ubicaciones como centroides para trazar un diagrama de Voronoi, que telesa en cuatro areas el plano de la Ciudad.
+    *  Guardamos los DataFrames de ubicaciones como un archivo Parquet en la carpeta `features/geospatial`.
 
 #### `db_loader.py`
 *   **Overview:** Proporciona utilidades para interactuar con la base de datos PostgreSQL.
@@ -310,17 +320,17 @@ A continuación se detallan los scripts más importantes del paquete `src/chicag
 #### `upsert_fact_tables.sql`
 *   **Overview:** Transfiere y transforma datos desde las tablas de `staging` a las tablas de hechos (`fact_tables`).
 *   **Lógica:**
-    1.  Utiliza una sentencia `INSERT INTO ... SELECT ...` para mover datos de `staging.stg_raw_trips` a `fact_tables.fact_trips`.
-    2.  Aplica una cláusula `ON CONFLICT (trip_id) DO UPDATE` para manejar registros duplicados, actualizando los existentes (UPSERT).
-    3.  Realiza el mismo proceso para las tablas de tráfico y clima.
-    4.  Filtra los registros a procesar según la ventana de tiempo de ejecución del DAG.
+    *  Utiliza una sentencia `INSERT INTO ... SELECT ...` para mover datos de `staging.stg_raw_trips` a `fact_tables.fact_trips`.
+    *  Aplica una cláusula `ON CONFLICT (trip_id) DO UPDATE` para manejar registros duplicados, actualizando los existentes (UPSERT).
+    *  Realiza el mismo proceso para las tablas de tráfico y clima.
+    *  Filtra los registros a procesar según la ventana de tiempo de ejecución del DAG.
 
 #### `create_data_marts.sql`
 *   **Overview:** Crea vistas materializadas que integran las tablas tablas de hechos (`fact_tables`) para análisis futuros.
 *   **Lógica:**
-    1.  Crea la vista materializada `dm_trips_hourly_pickup_stats` que agrega los viajes por hora y área de recogida para obtener estadísticas.
-    2.  Crea la vista materializada `fact_trips_with_traffic_weather` que enriquece cada viaje con los datos de tráfico y clima más cercanos en el tiempo.
-    3.  Crea una tabla base (`ml_base_table`) que integra las vistas anteriores y calcula características adicionales (features) usando funciones de ventana.
+    *  Crea la vista materializada `dm_trips_hourly_pickup_stats` que agrega los viajes por hora y área de recogida para obtener estadísticas.
+    *  Crea la vista materializada `fact_trips_with_traffic_weather` que enriquece cada viaje con los datos de tráfico y clima más cercanos en el tiempo.
+    *  Crea una tabla base (`ml_base_table`) que integra las vistas anteriores y calcula características adicionales (features) usando funciones de ventana.
 
 ## 🧪 Testing
 
