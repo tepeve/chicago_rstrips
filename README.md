@@ -263,6 +263,24 @@ erDiagram
 
 ```
 
+## 🗃️ Visualización de la Base de Datos con Adminer
+
+Para facilitar la exploración y validación de los datos, el `docker-compose` incluye **Adminer**, una herramienta ligera de gestión de bases de datos.
+
+1.  **Acceder a Adminer:**
+    Una vez que los contenedores estén corriendo, abrí tu navegador y andá a `http://localhost:8081`.
+
+2.  **Iniciar Sesión:**
+    Usá las siguientes credenciales para conectarte al Data Warehouse. Estos valores deben coincidir con los que definiste en tu archivo `.env`.
+
+    *   **System:** `PostgreSQL`
+    *   **Server:** `postgres_local_db` (es el nombre del servicio en `docker-compose.yml`)
+    *   **Username:** El valor de `POSTGRES_LOCAL_USER`
+    *   **Password:** El valor de `POSTGRES_LOCAL_PASSWORD`
+    *   **Database:** El valor de `POSTGRES_LOCAL_DB`
+
+    Una vez dentro, podrás navegar por los schemas (`staging`, `dim_spatial`, `fact_tables`, `data_marts`), ver el contenido de las tablas y ejecutar consultas SQL directamente desde la interfaz web.
+
 ## 📜 Descripción de Scripts Principales
 
 A continuación se detallan los scripts más importantes del paquete `src/chicago_rstrips`.
