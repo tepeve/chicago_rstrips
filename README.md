@@ -190,7 +190,7 @@ El pipeline construye y puebla una base de datos PostgreSQL con los siguientes s
 *   `data_marts`: Contiene vistas materializadas para análisis.
 
 ### Zoom-in a cómo se vinculan las facts tables de trips, traffic y weather:
-Este modelo de asociación espacial se aplica en el script [`join_spatial_dims.py`](scr/chicago_rstrips/join_spatial_dims.py) y se materializa en la tabla `dim_spatial.mapped_locations`. La relación temporal que vincula a estas mismas entidades se realiza en la vista materializada `datamarts.fact_trips_with_traffic_weather` al ejecutarse [`create_data_marts.sql`](sql/create_data_marts.sql).
+Este modelo de asociación espacial se aplica en el script [`join_spatial_dims.py`](src/chicago_rstrips/join_spatial_dims.py) y se materializa en la tabla `dim_spatial.mapped_locations`. La relación temporal que vincula a estas mismas entidades se realiza en la vista materializada `datamarts.fact_trips_with_traffic_weather` al ejecutarse [`create_data_marts.sql`](sql/create_data_marts.sql).
 
 ```mermaid
 erDiagram
