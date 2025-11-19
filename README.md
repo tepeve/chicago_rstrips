@@ -174,8 +174,6 @@ flowchart LR
 
 *   **Scripts de Carga y Base de Datos (`src/chicago_rstrips/`):**
     *   [`db_loader.py`](src/chicago_rstrips/db_loader.py): Contiene funciones genéricas para interactuar con PostgreSQL, como ejecutar DDLs y cargar DataFrames.
-    *   [`load_facts_to_staging.py`](src/chicago_rstrips/load_facts_to_staging.py): Scripts para cargar datos de hechos (trips, traffic) a las tablas de staging.
-    *   [`load_dim_*.py`](src/chicago_rstrips/load_dim_dynamic_tables.py): Scripts para cargar datos a las tablas de dimensiones.
 
 *   **Scripts SQL (`sql/`):**
     *   Contienen las sentencias DDL para crear los schemas, tablas y vistas materializadas, así como las sentencias DML (UPSERT) para mover datos de Staging al Data Warehouse.
